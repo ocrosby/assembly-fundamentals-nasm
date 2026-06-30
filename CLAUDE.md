@@ -38,62 +38,31 @@ year from now.
 - `examples/` — runnable `.asm` programs referenced by the guides (add when a
   guide grows past the single-screen budget).
 - `LICENSE` — MIT.
-- `.asm-lsp.toml` — language-server config (see **Editor Tooling** below).
+- `.asm-lsp.toml` — language-server config. See
+  [.claude/rules/asm-lsp-config.md](.claude/rules/asm-lsp-config.md).
   Do not delete it.
+- `.claude/rules/` — atomic project rules. See **Project Rules** below.
 
 ---
 
-## Editor Tooling
+## Project Rules
 
-Every `.asm` file in this repo is **NASM Intel syntax targeting x86-64**.
-That contract is enforced for editors by `.asm-lsp.toml` at the repo root,
-which pins asm-lsp to `assembler = "nasm"` and
-`instruction_set = "x86-64"`. Without this file asm-lsp defaults to GAS /
-AT&T syntax (and on Apple Silicon also defaults to `arm64`), and every
-NASM preprocessor directive, every NASM assembler directive, and every
-Intel-syntax operand is flagged as a phantom error.
+Atomic project rules live as individual files under
+[`.claude/rules/`](.claude/rules/). Each file describes one policy:
+what it is, why it exists, and how to recognize when it is being
+violated. **Read every file under `.claude/rules/` before changing
+work in this repo** — these rules are not duplicated in `CLAUDE.md`,
+and skipping them will produce changes that miss project policy.
 
-### When LSP diagnostics look wrong
+Current rules:
 
-If `asm-lsp` reports any of these on freshly-written, otherwise-valid
-NASM, the **tool is misconfigured**, not the source:
+- [asm-lsp-config](.claude/rules/asm-lsp-config.md) — every `.asm`
+  file is NASM Intel syntax for x86-64; `.asm-lsp.toml` enforces this
+  for editors; phantom LSP errors mean the tool is misconfigured, not
+  the source.
 
-- "unexpected token at start of statement" on lines starting with
-  `%define`, `%ifdef`, `%else`, `%endif`, `%macro`, `%endmacro`.
-- "unrecognized instruction mnemonic" on `default`, `global`, `section`,
-  `extern`, `equ`, or even on real instructions like `syscall`.
-- "invalid operand for instruction" on plain Intel-syntax operands such
-  as `mov rdi, 42` or `lea rsi, [msg]`.
-
-The fix is **always** in `.asm-lsp.toml`. Do not change the source files
-to match a misconfigured tool: do not switch to AT&T syntax, do not add
-per-file pragmas, do not insert inline disables, do not delete the
-`%ifdef MACOS` blocks. The source is correct by design.
-
-### Verifying the config is loaded
-
-When running inside Neovim, query the live LSP for the open buffer:
-
-```bash
-nvim --server "$NVIM" --remote-expr \
-  'luaeval("vim.json.encode(vim.diagnostic.get(vim.fn.bufnr(_A)))", "examples/01-exit-zero/exit-zero.asm")'
-```
-
-Zero diagnostics on a known-good example means the config is loaded. If
-you change `.asm-lsp.toml`, restart the LSP client:
-
-```bash
-nvim --server "$NVIM" --remote-expr \
-  'luaeval("(function() for _, c in pairs(vim.lsp.get_clients({name=\"asm_lsp\"})) do vim.lsp.stop_client(c.id, true) end vim.cmd(\"edit\") return \"ok\" end)()")'
-```
-
-### When extending tooling
-
-Any new language server, linter, or analyzer attached to `.asm` files
-must consume the same `assembler = nasm` / `instruction_set = x86-64`
-contract. Do not introduce a tool that demands a second source of truth
-for syntax or architecture; if a tool needs its own config, derive it
-from `.asm-lsp.toml` rather than duplicating the values.
+To add a rule, follow the workflow in
+[.claude/rules/README.md](.claude/rules/README.md).
 
 ---
 
