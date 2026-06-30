@@ -1,0 +1,22 @@
+# asm-lsp project configuration.
+#
+# Without this file, asm-lsp defaults to GAS / AT&T syntax (and on
+# Apple Silicon also defaults to the arm64 instruction set), so every
+# NASM preprocessor directive (`%define`, `%ifdef`, …), every NASM
+# assembler directive (`default`, `global`, `section`), and every
+# Intel-syntax operand (`mov rdi, 42`) is flagged as a phantom error.
+#
+# Set the assembler and instruction set explicitly so editor
+# diagnostics match what `nasm -f {elf64,macho64}` actually accepts.
+
+[default_config]
+version = "0.10.1"
+assembler = "nasm"
+instruction_set = "x86-64"
+
+[default_config.opts]
+# Editor-only checking against the asm-lsp instruction database.
+# `default_diagnostics = false` suppresses the secondary
+# "no compile_flags.txt" pass; the Makefile is our compile pipeline.
+diagnostics = true
+default_diagnostics = false
