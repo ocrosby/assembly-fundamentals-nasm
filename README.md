@@ -74,6 +74,8 @@ Read the docs in order, starting with the index:
 - [docs/01-installation.md](docs/01-installation.md) — verify your toolchain.
 - [docs/02-hello-world.md](docs/02-hello-world.md) — assemble, link, and run.
 - [docs/21-references.md](docs/21-references.md) — external manuals and reference sites.
+- [examples/](examples/) — a constructive sequence of seven runnable programs,
+  each with a `Makefile` that auto-detects Linux and macOS.
 
 Assemble, link, and run any example from a guide:
 

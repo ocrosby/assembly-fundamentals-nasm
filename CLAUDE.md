@@ -35,8 +35,8 @@ year from now.
 - `docs/` — numbered, single-screen topic guides.
   - `docs/README.md` is the index.
   - Filename pattern: `NN-slug.md` where `NN` controls reading order.
-- `examples/` — runnable `.asm` programs referenced by the guides (add when a
-  guide grows past the single-screen budget).
+- `examples/` — runnable `.asm` programs organized as a constructive sequence
+  (`01-…`, `02-…`, …). See **Runnable Examples** below for the full rules.
 - `LICENSE` — MIT.
 - `.asm-lsp.toml` — language-server config. See
   [.claude/rules/asm-lsp-config.md](.claude/rules/asm-lsp-config.md).
@@ -149,13 +149,71 @@ Use these spellings consistently across all docs:
 
 ---
 
-## When Adding a Runnable Example
+## Runnable Examples
 
-1. Place the source under `examples/<topic>/<name>.asm`.
-2. Add a sibling `README.md` showing the exact assemble/link/run commands for
-   Linux and macOS.
-3. Link to it from the relevant `docs/NN-*.md` file.
-4. Keep examples short enough to read at a glance — split, don't grow.
+Examples live under `examples/` and are organized as a **constructive
+sequence**. This is an intentional design decision — do not flatten it back
+into topical directories.
+
+### Constructive-sequence rule
+
+- Every example introduces **exactly one new atomic concept** on top of the
+  example immediately before it. If your new example would skip a step, add
+  the missing prerequisite first.
+- Directory names use the form `NN-slug`, where `NN` is the zero-padded
+  position in the sequence and `slug` describes the concept being
+  introduced (e.g., `01-exit-zero`, `06-sum-array`).
+- Renumber later directories only when strictly necessary. Stable numbers
+  reduce churn and protect cross-references in the docs.
+- Examples 1 and 2 (the smallest possible programs) intentionally have no
+  matching chapter — they exist so every later example can focus on a
+  single new idea instead of bundling it with syscall mechanics.
+
+### Required files in each `examples/NN-slug/`
+
+- `<slug>.asm` — the source. Cross-platform via a `%ifdef MACOS` block at
+  the top; declare both `_start` and `_main` as entry symbols so neither
+  linker needs `-e`.
+- `Makefile` — see Makefile conventions below.
+- `README.md` — what the example introduces, the expected exit code or
+  output, build commands (`make`, `make run`, `make clean`), and a link to
+  the next example in the sequence.
+
+### Makefile conventions
+
+Every example's `Makefile` must define these phony targets:
+
+| Target  | Behavior                                                    |
+|---------|-------------------------------------------------------------|
+| `all`   | Default. Assembles and links the binary.                    |
+| `build` | Assembles the source to `.o`.                               |
+| `link`  | Links the `.o` into the executable.                         |
+| `run`   | Runs the binary and prints its exit status.                 |
+| `clean` | Removes the `.o` and the executable.                        |
+
+The Makefile auto-detects platform with `uname -s` and selects the correct
+`nasm` format (`-f elf64` vs `-f macho64 -DMACOS`) and `ld` invocation
+(`ld` vs `ld -macos_version_min 11.0 -lSystem -syslibroot $(xcrun ...)`).
+Per-example `README.md` files document `make` / `make run` / `make clean`
+only — the raw `nasm` and `ld` commands are not restated.
+
+### When adding a new example
+
+1. Identify the next atomic concept in the sequence.
+2. Create `examples/NN-slug/` with the three required files. Copy the
+   `Makefile` from any existing example and change the `NAME :=` line.
+3. Add a row to the table in `examples/README.md` in sequence order.
+4. Add or update a `## Runnable` section in the relevant `docs/NN-*.md`
+   chapter to point at the new example.
+5. Verify it assembles, links, and runs on both Linux and macOS before
+   shipping.
+
+### Build artifacts
+
+`*.o`, `*.dSYM/`, and built example binaries are gitignored. The pattern
+in `.gitignore` ignores every file inside `examples/NN-*/` and then
+un-ignores `*.asm`, `Makefile`, and `README.md` — so new examples need no
+gitignore update.
 
 ---
 

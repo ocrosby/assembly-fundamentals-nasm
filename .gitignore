@@ -1,0 +1,21 @@
+# NASM object files
+*.o
+*.obj
+
+# macOS debug bundles
+*.dSYM/
+
+# Built example binaries. Ignore everything inside a numbered example
+# directory, then un-ignore the source files we actually want tracked.
+# This keeps the rule stable as new examples are added — there is no
+# need to enumerate each binary by name.
+examples/[0-9]*-*/*
+!examples/[0-9]*-*/*.asm
+!examples/[0-9]*-*/Makefile
+!examples/[0-9]*-*/README.md
+
+# macOS / editor cruft
+.DS_Store
+
+# Personal task tracking (global convention from ~/.claude/CLAUDE.md)
+TODO.md

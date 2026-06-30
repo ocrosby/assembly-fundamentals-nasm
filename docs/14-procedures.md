@@ -50,6 +50,11 @@ Calling it:
             call    square              ; rax = 49
 ```
 
+## Runnable
+
+- [examples/07-square/](../examples/07-square/) — `square` called from `_main`
+  with the result returned as the exit status. `make && make run`.
+
 ## Next
 
 - [The Stack](15-stack.md)
