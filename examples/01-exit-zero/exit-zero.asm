@@ -4,17 +4,19 @@
 ; New in this example: sections, entry symbols, syscall mechanics.
 
 %ifdef MACOS
-%define SYS_EXIT 0x2000001
+%define SYS_EXIT 0x2000001          ; macOS BSD syscall class 2, call 1
 %else
-%define SYS_EXIT 60
+%define SYS_EXIT 60                 ; Linux x86-64 sys_exit
 %endif
 
-            default rel
-            global  _start
-            global  _main
+default rel                         ; default to RIP-relative addressing
+global _start                       ; Linux entry symbol
+global _main                        ; macOS entry symbol
 
-            section .text
-_start:
-_main:      mov     rax, SYS_EXIT
-            xor     rdi, rdi                ; status = 0
-            syscall
+section .text
+
+_start:                             ; Linux jumps here
+_main:                              ; macOS jumps here (same address)
+    mov rax, SYS_EXIT               ; syscall number goes in rax
+    xor rdi, rdi                    ; arg 1 = 0  (xor self is shorter than mov 0)
+    syscall                         ; sys_exit(0) — kernel never returns

@@ -12,20 +12,25 @@
 %define SYS_EXIT 60
 %endif
 
-            default rel
-            global  _start
-            global  _main
+default rel
+global _start
+global _main
 
-            section .text
+section .text
+
 _start:
-_main:      mov     rdi, 7                  ; arg 1
-            call    square                  ; rax = 49
+_main:
+    mov rdi, 7                      ; arg 1: x = 7
+    call square                     ; rax = square(7) = 49; return address pushed onto stack
 
-            mov     rdi, rax
-            mov     rax, SYS_EXIT
-            syscall
+    mov rdi, rax                    ; arg 1: exit status = result
+    mov rax, SYS_EXIT
+    syscall                         ; sys_exit(49)
 
-; int64_t square(int64_t x)  --  x in rdi, result in rax
-square:     mov     rax, rdi
-            imul    rax, rdi
-            ret
+; int64_t square(int64_t x)
+;   x      in rdi  (System V AMD64 arg 1)
+;   result in rax  (System V AMD64 return value)
+square:
+    mov rax, rdi                    ; rax = x
+    imul rax, rdi                   ; rax = x * x   (two-operand signed multiply)
+    ret                             ; pop return address, jump to caller
