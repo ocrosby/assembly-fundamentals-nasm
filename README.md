@@ -37,7 +37,8 @@ purpose so a single concept fits on one screen.
 ## Requirements
 
 - A 64-bit x86 host (Linux or macOS; Windows via WSL2).
-- [NASM](https://www.nasm.us/) `>= 2.15`.
+- [NASM](https://www.nasm.us/) `>= 2.15` — see the
+  [NASM Manual](https://www.nasm.us/doc/) for syntax and directives.
 - A linker (`ld` on Linux, `ld` from Xcode Command Line Tools on macOS).
 - A debugger — `gdb` on Linux, `lldb` on macOS — for the debugging guide.
 - Optional: `make` for any local build scripts you add.
@@ -117,6 +118,14 @@ for the full guide — scope, conventions, the topic-file shape, commit-message
 format, and branching workflow. In short: open an issue describing the change
 before sending a substantial PR, and keep documentation contributions short,
 scannable, and consistent with the existing guides.
+
+## References
+
+- [NASM Manual](https://www.nasm.us/doc/) — the authoritative reference for
+  Netwide Assembler syntax, the preprocessor, output formats, and every
+  directive used in this repo.
+- [docs/21-references.md](docs/21-references.md) — instruction-set references,
+  syscall tables, and further reading.
 
 ## License
 
