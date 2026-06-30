@@ -26,10 +26,10 @@ Args (SysV): `rdi rsi rdx rcx r8 r9` · Return: `rax` · Callee-saved: `rbx rbp 
 ## Move and address
 
 ```nasm
-mov  rax, rbx       ; copy
-lea  rax, [rbx+8]   ; address arithmetic
-xchg rax, rbx       ; swap
-push rax / pop rbx  ; stack
+    mov rax, rbx             ; copy
+    lea rax, [rbx+8]         ; address arithmetic
+    xchg rax, rbx            ; swap
+    push rax / pop rbx       ; stack
 ```
 
 See [Data Movement](08-data-movement.md).
@@ -37,10 +37,10 @@ See [Data Movement](08-data-movement.md).
 ## Arithmetic
 
 ```nasm
-add  sub  inc  dec  neg
-imul rax, rbx
-xor  rdx, rdx ; before unsigned div
-div  rcx      ; rax / rcx, rem in rdx
+    add sub inc dec neg
+    imul rax, rbx
+    xor rdx, rdx             ; before unsigned div
+    div rcx                  ; rax / rcx, rem in rdx
 ```
 
 See [Arithmetic](09-arithmetic.md).
@@ -48,10 +48,10 @@ See [Arithmetic](09-arithmetic.md).
 ## Logic and shifts
 
 ```nasm
-and or xor not
-shl shr sar     ; logical / arithmetic
-rol ror         ; rotates
-test rax, rax   ; ZF if zero
+    and or xor not
+    shl shr sar              ; logical / arithmetic
+    rol ror                  ; rotates
+    test rax, rax            ; ZF if zero
 ```
 
 See [Bitwise & Shifts](10-bitwise.md).
@@ -59,11 +59,11 @@ See [Bitwise & Shifts](10-bitwise.md).
 ## Control flow
 
 ```nasm
-cmp rax, rbx
-je jne jl jle jg jge      ; signed
-jb jbe ja jae             ; unsigned
-jmp label
-call proc / ret
+    cmp rax, rbx
+    je jne jl jle jg jge     ; signed
+    jb jbe ja jae            ; unsigned
+    jmp label
+    call proc / ret
 ```
 
 See [Comparison & Flags](11-comparison.md), [Jumps](12-jumps.md), [Procedures](14-procedures.md).
@@ -80,8 +80,8 @@ See [System Calls](16-system-calls.md).
 ## Idioms
 
 ```nasm
-xor  rax, rax       ; zero a register
-test rax, rax       ; flag-set without modifying it
-sub  rsp, 8         ; re-align stack before a libc call
-default rel         ; RIP-relative addressing for PIE
+    xor rax, rax             ; zero a register
+    test rax, rax            ; flag-set without modifying it
+    sub rsp, 8               ; re-align stack before a libc call
+default rel                  ; RIP-relative addressing for PIE
 ```

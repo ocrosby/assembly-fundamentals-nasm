@@ -5,7 +5,8 @@ NASM uses **Intel syntax**: `instruction destination, source`.
 ## Anatomy of a line
 
 ```nasm
-label:      mnemonic    operand1, operand2      ; comment
+label:
+    mnemonic operand1, operand2 ; comment
 ```
 
 - **Label** — optional name for the current address; ends in `:`.
@@ -20,9 +21,11 @@ label:      mnemonic    operand1, operand2      ; comment
 - Local labels start with `.` and are scoped to the previous non-local label:
 
 ```nasm
-main:       mov     rcx, 10
-.next:      dec     rcx
-            jnz     .next
+main:
+    mov rcx, 10
+.next:
+    dec rcx
+    jnz .next
 ```
 
 ## Numeric literals
@@ -50,8 +53,8 @@ main:       mov     rcx, 10
 NASM accepts single, double, and backquoted strings. Only **backquoted** strings interpret escapes like `\n`:
 
 ```nasm
-a:  db  "hello"        ; literal h e l l o
-b:  db  `hello\n`      ; literal h e l l o 0x0a
+a: db "hello"                   ; literal h e l l o
+b: db `hello\n`                 ; literal h e l l o 0x0a
 ```
 
 ## Next

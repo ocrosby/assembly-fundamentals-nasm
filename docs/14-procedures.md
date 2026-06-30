@@ -5,11 +5,11 @@ A procedure is a labeled block of code reached with `call` and exited with `ret`
 ## `call` and `ret`
 
 ```nasm
-            call    my_proc             ; push return address, jump
-            ; ... execution resumes here after ret ...
+    call my_proc             ; push return address, jump
+    ; ... execution resumes here after ret ...
 
-my_proc:    ; ... body ...
-            ret                         ; pop address from stack, jump to it
+my_proc: ; ... body ...
+    ret                      ; pop address from stack, jump to it
 ```
 
 `call` pushes the address of the next instruction; `ret` pops it back into `rip`.
@@ -34,20 +34,20 @@ At the moment of `call`, `rsp` must be **16-byte aligned minus 8** (so it become
 ## A complete example
 
 ```nasm
-            global  square
-            section .text
+global square
+section .text
 
-square:     ; int64_t square(int64_t x)  -- x in rdi, result in rax
-            mov     rax, rdi
-            imul    rax, rdi
-            ret
+square: ; int64_t square(int64_t x)  -- x in rdi, result in rax
+    mov rax, rdi
+    imul rax, rdi
+    ret
 ```
 
 Calling it:
 
 ```nasm
-            mov     rdi, 7
-            call    square              ; rax = 49
+    mov rdi, 7
+    call square              ; rax = 49
 ```
 
 ## Runnable

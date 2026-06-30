@@ -14,19 +14,20 @@ A NASM program is partitioned into **sections**. Each section ends up in a regio
 ## Switching sections
 
 ```nasm
-            section .text
-            global  _start
-_start:     mov     rax, [counter]      ; read from .data
-            mov     rbx, [scratch]      ; read from .bss
+section .text
+global _start
+_start:
+    mov rax, [counter]       ; read from .data
+    mov rbx, [scratch]       ; read from .bss
 
-            section .data
-counter:    dq      1                   ; 8-byte int = 1
+section .data
+counter: dq 1                         ; 8-byte int = 1
 
-            section .bss
-scratch:    resq    1                   ; reserve 8 bytes, zeroed
+section .bss
+scratch: resq 1                       ; reserve 8 bytes, zeroed
 
-            section .rodata
-greeting:   db      "hi", 0
+section .rodata
+greeting: db "hi", 0
 ```
 
 ## Why `.bss` is special
@@ -38,9 +39,9 @@ greeting:   db      "hi", 0
 Modern macOS and most Linux toolchains expect position-independent addressing. Tell NASM to default to RIP-relative:
 
 ```nasm
-            default rel
-            section .text
-            lea     rsi, [msg]          ; really [rip + msg]
+default rel
+section .text
+    lea rsi, [msg]           ; really [rip + msg]
 ```
 
 ## Next

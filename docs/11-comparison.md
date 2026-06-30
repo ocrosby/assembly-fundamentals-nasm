@@ -15,10 +15,10 @@ Most decisions in assembly are made by *setting flags* with one instruction and 
 ## `cmp` — subtract, discard, keep flags
 
 ```nasm
-            cmp     rax, rbx            ; flags as if (rax - rbx)
-            je      .equal              ; jump if ZF=1
-            jl      .less               ; jump if SF != OF (signed less)
-            jb      .below              ; jump if CF=1   (unsigned less)
+    cmp rax, rbx             ; flags as if (rax - rbx)
+    je .equal                ; jump if ZF=1
+    jl .less                 ; jump if SF != OF (signed less)
+    jb .below                ; jump if CF=1   (unsigned less)
 ```
 
 ## `test` — AND, discard, keep flags
@@ -26,11 +26,11 @@ Most decisions in assembly are made by *setting flags* with one instruction and 
 Use for "is this nonzero?" and bit checks.
 
 ```nasm
-            test    rax, rax            ; sets ZF if rax == 0
-            jz      .is_zero
+    test rax, rax            ; sets ZF if rax == 0
+    jz .is_zero
 
-            test    rax, 1 << 4         ; sets ZF if bit 4 clear
-            jnz     .bit_set
+    test rax, 1 << 4         ; sets ZF if bit 4 clear
+    jnz .bit_set
 ```
 
 ## Signed vs unsigned conditional jumps
@@ -49,9 +49,9 @@ Pick the column that matches the meaning of your data. Mixing them is a frequent
 ## `setcc` — materialize a flag as 0 or 1
 
 ```nasm
-            cmp     rax, rbx
-            setl    al                  ; al = (rax < rbx) ? 1 : 0
-            movzx   eax, al
+    cmp rax, rbx
+    setl al                  ; al = (rax < rbx) ? 1 : 0
+    movzx eax, al
 ```
 
 ## Next

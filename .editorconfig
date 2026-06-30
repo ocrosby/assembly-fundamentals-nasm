@@ -1,0 +1,32 @@
+# EditorConfig — https://editorconfig.org/
+#
+# The repo-wide defaults below set 4-space indent for NASM source so it
+# reads like modern code (Python, Go, Rust) instead of the older
+# 8-/12-column "instruction field" convention. Override here, not in
+# per-editor settings.
+
+root = true
+
+[*]
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true
+trim_trailing_whitespace = true
+indent_style = space
+indent_size = 4
+
+[*.asm]
+indent_style = space
+indent_size = 4
+
+[*.md]
+indent_size = 2
+# Markdown uses two trailing spaces to force a line break.
+trim_trailing_whitespace = false
+
+[Makefile]
+# Make recipes are tab-indented; this is a hard rule, not a style choice.
+indent_style = tab
+
+[*.{yml,yaml,toml}]
+indent_size = 2

@@ -5,11 +5,11 @@ Integer math on x86-64. All instructions below update RFLAGS (see [Comparison & 
 ## Addition and subtraction
 
 ```nasm
-            add     rax, rbx            ; rax += rbx
-            sub     rax, 1              ; rax -= 1
-            inc     rcx                 ; rcx += 1
-            dec     rcx                 ; rcx -= 1
-            neg     rax                 ; rax = -rax
+    add rax, rbx             ; rax += rbx
+    sub rax, 1               ; rax -= 1
+    inc rcx                  ; rcx += 1
+    dec rcx                  ; rcx -= 1
+    neg rax                  ; rax = -rax
 ```
 
 `inc`/`dec` do not update the carry flag — use `add reg, 1` in flag-sensitive code.
@@ -30,17 +30,17 @@ The two- and three-operand `imul` forms are preferred when you do not need the f
 `div` and `idiv` divide a 128-bit dividend in `rdx:rax` by the operand. **Clear `rdx` first** for unsigned division; use `cqo` to sign-extend `rax` into `rdx` for signed division.
 
 ```nasm
-            xor     rdx, rdx
-            mov     rax, 100
-            mov     rcx, 7
-            div     rcx                 ; rax = 14, rdx = 2 (remainder)
+    xor rdx, rdx
+    mov rax, 100
+    mov rcx, 7
+    div rcx                  ; rax = 14, rdx = 2 (remainder)
 ```
 
 ```nasm
-            mov     rax, -100
-            cqo                         ; sign-extend rax -> rdx:rax
-            mov     rcx, 7
-            idiv    rcx                 ; signed division
+    mov rax, -100
+    cqo                      ; sign-extend rax -> rdx:rax
+    mov rcx, 7
+    idiv rcx                 ; signed division
 ```
 
 A division by zero raises `#DE`; the OS turns it into `SIGFPE` on Linux/macOS.
@@ -50,16 +50,17 @@ A division by zero raises `#DE`; the OS turns it into `SIGFPE` on Linux/macOS.
 A complete Linux program that returns `7 + 5` as its exit status. Reading the result with `echo $?` is the simplest way to "see" the answer without writing to stdout.
 
 ```nasm
-            global  _start
+global _start
 
-            section .text
-_start:     mov     rax, 7
-            mov     rbx, 5
-            add     rax, rbx        ; rax = 12
+section .text
+_start:
+    mov rax, 7
+    mov rbx, 5
+    add rax, rbx             ; rax = 12
 
-            mov     rdi, rax        ; exit status = 12
-            mov     rax, 60         ; sys_exit (Linux)
-            syscall
+    mov rdi, rax             ; exit status = 12
+    mov rax, 60              ; sys_exit (Linux)
+    syscall
 ```
 
 ```bash
