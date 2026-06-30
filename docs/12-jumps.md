@@ -5,9 +5,9 @@ Transfer control to another address.
 ## Unconditional
 
 ```nasm
-            jmp     .label              ; relative jump within function
-            jmp     rax                 ; indirect through register
-            jmp     [table + rcx*8]     ; indirect through memory (jump table)
+    jmp .label               ; relative jump within function
+    jmp rax                  ; indirect through register
+    jmp [table + rcx*8]      ; indirect through memory (jump table)
 ```
 
 ## Conditional (`jcc`)
@@ -15,20 +15,22 @@ Transfer control to another address.
 A conditional jump tests RFLAGS (set by `cmp`, `test`, arithmetic). See [Comparison & Flags](11-comparison.md) for the full table.
 
 ```nasm
-            cmp     rax, 0
-            je      .zero               ; jump if equal
-            jne     .nonzero            ; jump if not equal
-            jl      .negative           ; jump if signed-less
-            jge     .nonneg             ; jump if signed >=
+    cmp rax, 0
+    je .zero                 ; jump if equal
+    jne .nonzero             ; jump if not equal
+    jl .negative             ; jump if signed-less
+    jge .nonneg              ; jump if signed >=
 ```
 
 ## A worked example — `abs(rax)`
 
 ```nasm
-abs64:      test    rax, rax
-            jns     .done               ; jump if not signed (SF=0)
-            neg     rax
-.done:      ret
+abs64:
+    test rax, rax
+    jns .done                ; jump if not signed (SF=0)
+    neg rax
+.done:
+    ret
 ```
 
 ## Conditional moves (`cmovcc`)
@@ -36,9 +38,9 @@ abs64:      test    rax, rax
 Branchless alternative to short if/else. Faster when the branch is unpredictable.
 
 ```nasm
-            cmp     rax, rbx
-            mov     rcx, rax
-            cmovl   rcx, rbx            ; rcx = min(rax, rbx)
+    cmp rax, rbx
+    mov rcx, rax
+    cmovl rcx, rbx           ; rcx = min(rax, rbx)
 ```
 
 ## Short vs near vs far

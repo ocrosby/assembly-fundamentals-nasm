@@ -5,22 +5,23 @@ The smallest complete program: write a string to stdout and exit.
 ## Source — `hello.asm`
 
 ```nasm
-            global  _start
+global _start
 
-            section .text
-_start:     mov     rax, 1          ; sys_write
-            mov     rdi, 1          ; fd = stdout
-            mov     rsi, msg        ; buffer
-            mov     rdx, msg_len    ; length
-            syscall
+section .text
+_start:
+    mov rax, 1               ; sys_write
+    mov rdi, 1               ; fd = stdout
+    mov rsi, msg             ; buffer
+    mov rdx, msg_len         ; length
+    syscall
 
-            mov     rax, 60         ; sys_exit
-            xor     rdi, rdi        ; status = 0
-            syscall
+    mov rax, 60              ; sys_exit
+    xor rdi, rdi             ; status = 0
+    syscall
 
-            section .rodata
-msg:        db      "Hello, world!", 10
-msg_len:    equ     $ - msg
+section .rodata
+msg: db "Hello, world!", 10
+msg_len: equ $ - msg
 ```
 
 The example above uses Linux syscall numbers. On macOS, see [System Calls](16-system-calls.md).

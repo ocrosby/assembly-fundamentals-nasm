@@ -60,6 +60,10 @@ Current rules:
   file is NASM Intel syntax for x86-64; `.asm-lsp.toml` enforces this
   for editors; phantom LSP errors mean the tool is misconfigured, not
   the source.
+- [asm-style](.claude/rules/asm-style.md) — NASM source uses 4-space
+  indent (enforced by `.editorconfig`), labels on their own line, and
+  instructive inline comments that explain intent rather than
+  restating the opcode.
 
 To add a rule, follow the workflow in
 [.claude/rules/README.md](.claude/rules/README.md).

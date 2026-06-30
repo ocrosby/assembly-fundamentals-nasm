@@ -26,19 +26,19 @@ NASM has no high-level types — only sized cells. You choose width with a direc
 When the size cannot be inferred from a register, prefix the memory operand:
 
 ```nasm
-            mov     byte  [buf], 1
-            mov     word  [count], 1000
-            mov     dword [flag], 0
-            mov     qword [ptr], rax
+    mov byte [buf], 1
+    mov word [count], 1000
+    mov dword [flag], 0
+    mov qword [ptr], rax
 ```
 
 ## Strings and arrays
 
 ```nasm
-            section .data
-name:       db      "Ada", 0            ; NUL-terminated
-nums:       dd      1, 2, 3, 4, 5       ; 5-element int32 array
-nums_len:   equ     ($ - nums) / 4      ; computed at assemble time
+section .data
+name: db "Ada", 0                  ; NUL-terminated
+nums: dd 1, 2, 3, 4, 5             ; 5-element int32 array
+nums_len: equ ($ - nums) / 4           ; computed at assemble time
 ```
 
 `$` is the current address; `$$` is the start of the current section.

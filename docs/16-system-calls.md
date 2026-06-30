@@ -28,11 +28,11 @@ Common numbers (from `/usr/include/asm/unistd_64.h`):
 | `exit`     | 60     | status            |
 
 ```nasm
-            mov     rax, 1
-            mov     rdi, 1
-            mov     rsi, msg
-            mov     rdx, msg_len
-            syscall                     ; write(1, msg, msg_len)
+    mov rax, 1
+    mov rdi, 1
+    mov rsi, msg
+    mov rdx, msg_len
+    syscall                  ; write(1, msg, msg_len)
 ```
 
 ## macOS
@@ -45,11 +45,11 @@ macOS sets the **high byte** of `rax` to the syscall class and the low bytes to 
 | `exit`     | `0x2000001`        | status            |
 
 ```nasm
-            mov     rax, 0x2000004
-            mov     rdi, 1
-            lea     rsi, [rel msg]
-            mov     rdx, msg_len
-            syscall
+    mov rax, 0x2000004
+    mov rdi, 1
+    lea rsi, [rel msg]
+    mov rdx, msg_len
+    syscall
 ```
 
 Apple discourages direct syscalls and may break them between macOS releases. For anything beyond a toy, link `libSystem` and call `write`, `exit`, etc., as ordinary functions. See [Linking](18-linking.md).

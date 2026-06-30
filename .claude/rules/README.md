@@ -13,6 +13,9 @@ them.
 - [asm-lsp-config.md](asm-lsp-config.md) — `.asm` files are NASM Intel
   syntax for x86-64; `.asm-lsp.toml` enforces this for editors; do not
   change source to silence misconfigured tooling.
+- [asm-style.md](asm-style.md) — NASM source uses 4-space indent,
+  labels on their own line, and instructive inline comments that
+  explain intent rather than restating the opcode.
 
 ## Adding a rule
 

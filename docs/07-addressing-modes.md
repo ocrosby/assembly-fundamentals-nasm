@@ -7,8 +7,8 @@ Operands fall into three families: **immediate**, **register**, and **memory**.
 A constant baked into the instruction.
 
 ```nasm
-            mov     rax, 42
-            add     rbx, 0x10
+    mov rax, 42
+    add rbx, 0x10
 ```
 
 ## Register
@@ -16,7 +16,7 @@ A constant baked into the instruction.
 A value held in a CPU register.
 
 ```nasm
-            mov     rax, rbx
+    mov rax, rbx
 ```
 
 ## Memory
@@ -37,13 +37,13 @@ Square brackets dereference an address. The general form is:
 ### Examples
 
 ```nasm
-            mov     rax, [buf]              ; direct
-            mov     rax, [rbx]              ; register-indirect
-            mov     rax, [rbx + 8]          ; base + disp
-            mov     rax, [rbx + rcx]        ; base + index
-            mov     rax, [rbx + rcx*4]      ; base + index*scale
-            mov     rax, [rbx + rcx*8 + 16] ; full form
-            mov     rax, [rel buf]          ; RIP-relative
+    mov rax, [buf]           ; direct
+    mov rax, [rbx]           ; register-indirect
+    mov rax, [rbx + 8]       ; base + disp
+    mov rax, [rbx + rcx]     ; base + index
+    mov rax, [rbx + rcx*4]   ; base + index*scale
+    mov rax, [rbx + rcx*8 + 16] ; full form
+    mov rax, [rel buf]       ; RIP-relative
 ```
 
 ## `lea` — address arithmetic without dereferencing
@@ -51,7 +51,7 @@ Square brackets dereference an address. The general form is:
 `lea` computes the effective address but does **not** read memory. It is also a fast way to do `base + index*k + d` arithmetic:
 
 ```nasm
-            lea     rax, [rbx + rcx*4 + 8]  ; rax = rbx + rcx*4 + 8
+    lea rax, [rbx + rcx*4 + 8] ; rax = rbx + rcx*4 + 8
 ```
 
 ## Sizing memory operands
@@ -59,7 +59,7 @@ Square brackets dereference an address. The general form is:
 The processor needs to know how wide the access is. If neither operand pins it down, prefix it:
 
 ```nasm
-            inc     qword [counter]
+    inc qword [counter]
 ```
 
 ## Next

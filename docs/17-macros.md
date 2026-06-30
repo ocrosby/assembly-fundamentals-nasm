@@ -8,8 +8,8 @@ NASM has a powerful preprocessor that runs before assembly. It is your main tool
 %define SYS_WRITE       1
 %define STDOUT          1
 
-            mov     rax, SYS_WRITE
-            mov     rdi, STDOUT
+    mov rax, SYS_WRITE
+    mov rdi, STDOUT
 ```
 
 `%define` is textual and case-sensitive. Prefer it over `equ` when the value is conceptually a *name* rather than an *address-time constant*.
@@ -17,7 +17,7 @@ NASM has a powerful preprocessor that runs before assembly. It is your main tool
 ## `equ` — assemble-time constant
 
 ```nasm
-buf_len     equ     64
+buf_len equ 64
 ```
 
 Bound to a label and known to the assembler as a value with a section.
@@ -26,14 +26,14 @@ Bound to a label and known to the assembler as a value with a section.
 
 ```nasm
 %macro write 2
-            mov     rax, 1
-            mov     rdi, 1
-            mov     rsi, %1
-            mov     rdx, %2
-            syscall
+    mov rax, 1
+    mov rdi, 1
+    mov rsi, %1
+    mov rdx, %2
+    syscall
 %endmacro
 
-            write   msg, msg_len
+    write msg, msg_len
 ```
 
 `%1`, `%2`, … are the macro arguments; the `2` after `%macro` is the argument count.
@@ -42,12 +42,12 @@ Bound to a label and known to the assembler as a value with a section.
 
 ```nasm
 %ifdef LINUX
-            mov     rax, 60
+    mov rax, 60
 %else
-            mov     rax, 0x2000001
+    mov rax, 0x2000001
 %endif
-            xor     rdi, rdi
-            syscall
+    xor rdi, rdi
+    syscall
 ```
 
 Pass `-DLINUX` on the NASM command line to set the symbol.
