@@ -112,10 +112,11 @@ screen of vertical scroll, and link it from [docs/README.md](docs/README.md).
 
 ## Contributing
 
-Issues and pull requests are welcome. Open an issue describing the topic or
-correction you would like to address before sending a substantial change. Keep
-documentation contributions short, scannable, and consistent with the existing
-guides.
+Issues and pull requests are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md)
+for the full guide — scope, conventions, the topic-file shape, commit-message
+format, and branching workflow. In short: open an issue describing the change
+before sending a substantial PR, and keep documentation contributions short,
+scannable, and consistent with the existing guides.
 
 ## License
 
