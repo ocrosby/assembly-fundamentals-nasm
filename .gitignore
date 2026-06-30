@@ -1,0 +1,16 @@
+# NASM object files
+*.o
+
+# Built example binaries (no extension)
+examples/hello/hello
+examples/arithmetic/add
+examples/loops/countdown
+examples/loops/sum-array
+examples/procedures/square
+
+# macOS / editor cruft
+.DS_Store
+*.dSYM/
+
+# Personal task tracking — global CLAUDE.md convention
+TODO.md

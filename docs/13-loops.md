@@ -45,9 +45,10 @@ arr_len:    equ     ($ - arr) / 8
             section .text
 sum_arr:    xor     rax, rax            ; sum
             xor     rcx, rcx            ; index
+            lea     rbx, [arr]          ; base ptr (RIP-relative)
 .next:      cmp     rcx, arr_len
             jge     .done
-            add     rax, [arr + rcx*8]
+            add     rax, [rbx + rcx*8]
             inc     rcx
             jmp     .next
 .done:      ret
@@ -66,6 +67,10 @@ sum_arr:    xor     rax, rax            ; sum
 ```
 
 `cld` clears DF so the pointers advance forward; `std` makes them go backward.
+
+## Runnable
+
+- [examples/loops/](../examples/loops/) — `countdown.asm` and `sum-array.asm`.
 
 ## Next
 

@@ -40,6 +40,7 @@ A progressive walkthrough of x86-64 assembly with NASM. Each guide is intentiona
 ## Appendix
 
 - [References](21-references.md) — external manuals, instruction-set references, and syscall tables.
+- [Runnable examples](../examples/) — complete programs paired with chapters 2, 9, 13, and 14.
 
 ## Conventions Used in These Guides
 

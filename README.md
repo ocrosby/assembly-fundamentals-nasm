@@ -73,6 +73,7 @@ Read the docs in order, starting with the index:
 - [docs/01-installation.md](docs/01-installation.md) — verify your toolchain.
 - [docs/02-hello-world.md](docs/02-hello-world.md) — assemble, link, and run.
 - [docs/21-references.md](docs/21-references.md) — external manuals and reference sites.
+- [examples/](examples/) — runnable cross-platform programs for the early chapters.
 
 Assemble, link, and run any example from a guide:
 

@@ -45,6 +45,11 @@ ld -macos_version_min 11.0 -lSystem -o hello hello.o \
 ./hello
 ```
 
+## Runnable
+
+- [examples/hello/](../examples/hello/) — cross-platform variant of this
+  program with build commands for both Linux and macOS.
+
 ## Next
 
 - [NASM Syntax](03-syntax.md)
