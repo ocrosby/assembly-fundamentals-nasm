@@ -133,6 +133,22 @@ npx cspell '**/*.md'
 If you add `.asm` examples, assemble and run them on the platform you are
 targeting before submitting.
 
+## Editor tooling
+
+The repository ships an `.asm-lsp.toml` that pins
+[asm-lsp](https://github.com/bergercookie/asm-lsp) to NASM Intel syntax for
+x86-64. If your editor's LSP reports errors like *"unrecognized instruction
+mnemonic"* on `default`, `global`, `section`, or `syscall`, or *"unexpected
+token at start of statement"* on lines beginning with `%define` or `%ifdef`,
+the LSP is running in its default GAS / AT&T / arm64 mode and has not picked
+up the config. Restart the LSP client after the first open, or open a known
+file like `examples/01-exit-zero/exit-zero.asm` first so asm-lsp loads the
+project root.
+
+Do not change source files to silence a misconfigured tool. The `.asm` files
+are in NASM Intel syntax by design; phantom diagnostics are always a
+tooling problem, never a source problem.
+
 ## Reporting documentation bugs
 
 Open an issue with:

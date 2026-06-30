@@ -38,6 +38,31 @@ year from now.
 - `examples/` — runnable `.asm` programs referenced by the guides (add when a
   guide grows past the single-screen budget).
 - `LICENSE` — MIT.
+- `.asm-lsp.toml` — language-server config. See
+  [.claude/rules/asm-lsp-config.md](.claude/rules/asm-lsp-config.md).
+  Do not delete it.
+- `.claude/rules/` — atomic project rules. See **Project Rules** below.
+
+---
+
+## Project Rules
+
+Atomic project rules live as individual files under
+[`.claude/rules/`](.claude/rules/). Each file describes one policy:
+what it is, why it exists, and how to recognize when it is being
+violated. **Read every file under `.claude/rules/` before changing
+work in this repo** — these rules are not duplicated in `CLAUDE.md`,
+and skipping them will produce changes that miss project policy.
+
+Current rules:
+
+- [asm-lsp-config](.claude/rules/asm-lsp-config.md) — every `.asm`
+  file is NASM Intel syntax for x86-64; `.asm-lsp.toml` enforces this
+  for editors; phantom LSP errors mean the tool is misconfigured, not
+  the source.
+
+To add a rule, follow the workflow in
+[.claude/rules/README.md](.claude/rules/README.md).
 
 ---
 
