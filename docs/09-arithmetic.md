@@ -74,6 +74,11 @@ ld add.o -o add
 - `mul`/`div` clobber `rdx` even when you don't expect it.
 - `neg` of `INT64_MIN` overflows back to itself; check OF if it matters.
 
+## Runnable
+
+- [examples/03-add/](../examples/03-add/) — the addition program above as a
+  complete cross-platform source file. `make && make run`.
+
 ## Next
 
 - [Bitwise & Shifts](10-bitwise.md)

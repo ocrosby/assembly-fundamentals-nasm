@@ -45,6 +45,11 @@ ld -macos_version_min 11.0 -lSystem -o hello hello.o \
 ./hello
 ```
 
+## Runnable
+
+- [examples/04-hello/](../examples/04-hello/) — `make && make run`. Cross-platform
+  source with the syscall numbers swapped by `%ifdef MACOS`.
+
 ## Next
 
 - [NASM Syntax](03-syntax.md)
