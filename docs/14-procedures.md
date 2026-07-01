@@ -52,7 +52,7 @@ Calling it:
 
 ## Runnable
 
-- [examples/07-square/](../examples/07-square/) — `square` called from `_main`
+- [examples/14-square/](../examples/14-square/) — `square` called from `_main`
   with the result returned as the exit status. `make && make run`.
 
 ## Next

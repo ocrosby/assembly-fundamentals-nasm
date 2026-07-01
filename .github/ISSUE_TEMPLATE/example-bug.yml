@@ -11,12 +11,19 @@ body:
         - examples/01-exit-zero
         - examples/02-exit-status
         - examples/03-add
-        - examples/04-hello
-        - examples/05-countdown
-        - examples/06-sum-array
-        - examples/07-square
-        - examples/08-stack-frame
-        - examples/09-macros
+        - examples/04-write-char
+        - examples/05-read-char
+        - examples/06-read-line
+        - examples/07-write-line
+        - examples/08-echo-loop
+        - examples/09-read-file
+        - examples/10-write-file
+        - examples/11-copy-file
+        - examples/12-countdown
+        - examples/13-sum-array
+        - examples/14-square
+        - examples/15-stack-frame
+        - examples/16-macros
     validations:
       required: true
 

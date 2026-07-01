@@ -1,7 +1,7 @@
 # lldb Walkthrough
 
 A step-by-step tour of debugging a small NASM program under `lldb` on
-macOS. The target is [`examples/07-square`](../examples/07-square/),
+macOS. The target is [`examples/14-square`](../examples/14-square/),
 which is small enough to step through end-to-end, and rich enough to
 show a `call`, a `ret`, and a return value flowing back through the
 System V AMD64 ABI. For the Linux counterpart, see
@@ -15,7 +15,7 @@ For the reference-level `lldb` command list, see
 Build the target with DWARF debug info:
 
 ```bash
-cd examples/07-square
+cd examples/14-square
 make clean
 nasm -f macho64 -DMACOS -g -F dwarf square.asm -o square.o
 ld -macos_version_min 11.0 -lSystem \

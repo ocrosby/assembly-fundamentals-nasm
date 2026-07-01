@@ -58,7 +58,7 @@ If you `call` external code without a prologue, align manually:
 
 ## Runnable
 
-- [examples/08-stack-frame/](../examples/08-stack-frame/) — a full frame-pointer prologue and epilogue with two stack locals; steppable under `lldb` or `gdb`.
+- [examples/15-stack-frame/](../examples/15-stack-frame/) — a full frame-pointer prologue and epilogue with two stack locals; steppable under `lldb` or `gdb`.
 
 ## Next
 

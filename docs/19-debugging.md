@@ -72,7 +72,7 @@ nm ./hello | grep ' T '     # what code symbols exist?
 
 ## For a full walkthrough
 
-- [lldb Walkthrough](23-lldb-walkthrough.md) — step through `examples/07-square` end-to-end on macOS, watching a `call`, the callee body, and the return value flow back through `rax`.
+- [lldb Walkthrough](23-lldb-walkthrough.md) — step through `examples/14-square` end-to-end on macOS, watching a `call`, the callee body, and the return value flow back through `rax`.
 - [gdb Walkthrough](24-gdb-walkthrough.md) — the same walkthrough, on Linux.
 
 ## Next

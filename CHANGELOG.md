@@ -8,8 +8,24 @@ The repository is unversioned — only the tip of `main` is maintained
 
 ## Unreleased
 
-- Placeholder for changes on `main` since the last dated section
-  below. Move to a dated section when the batch settles.
+- Expand `examples/` into a full I/O curriculum. Old `04-hello`
+  removed; eight new examples land at 04–11 covering
+  `sys_write`/`sys_read` at char and line granularities, an
+  echo-until-EOF loop, and `sys_open`/`sys_close`-based file
+  read / write / copy. The existing pedagogy (loops, memory,
+  procedures, stack frames, macros) is preserved; those examples
+  are renumbered from 05–09 to 12–16.
+    * New: `04-write-char`, `05-read-char`, `06-read-line`,
+      `07-write-line`, `08-echo-loop`, `09-read-file`,
+      `10-write-file`, `11-copy-file`.
+    * Renumbered: 05-countdown → 12, 06-sum-array → 13,
+      07-square → 14, 08-stack-frame → 15, 09-macros → 16.
+    * Every reference across `docs/`, both walkthrough chapters
+      (`docs/23`, `docs/24`), the issue-template dropdown, and the
+      CI expected-exit table updated to match the new numbering.
+    * CI seeds `/tmp/nasm-read-file.txt` and `/tmp/nasm-copy-src.txt`
+      before the loop, and pipes empty stdin into the three stdin-
+      reading examples so they hit EOF and exit cleanly.
 
 ## 2026-07 — Audit follow-up, CI hardening, community files
 

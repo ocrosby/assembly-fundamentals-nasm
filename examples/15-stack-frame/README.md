@@ -2,7 +2,7 @@
 
 Call a function that uses a full frame-pointer prologue and stores
 two intermediate squares as stack locals. Builds on
-[07-square](../07-square/) by promoting the leaf function into one
+[14-square](../14-square/) by promoting the leaf function into one
 with a proper stack frame.
 
 Computes `3*3 + 4*4 = 25` and returns it as the exit status.
@@ -29,5 +29,5 @@ Expected: `exit=25`.
 
 ## Next
 
-- [09-macros](../09-macros/) — hide the syscall boilerplate behind
+- [09-macros](../16-macros/) — hide the syscall boilerplate behind
   `%macro`.
