@@ -61,6 +61,9 @@ Calling it:
   subroutine called with **eight** integer args: the first six go
   in registers, the last two travel on the stack per the System V
   AMD64 ABI.
+- [examples/18-divmod/](../examples/18-divmod/) — a subroutine
+  that returns **two** values at once via `rax` and `rdx`, the
+  ABI's two return-value slots. `div` writes both halves natively.
 
 ## Next
 

@@ -2,7 +2,7 @@
 
 A constructive sequence of small x86-64 NASM programs. Each example
 introduces exactly one new atomic concept on top of the previous one,
-so reading from `01` to `18` walks the entire control-and-data
+so reading from `01` to `19` walks the entire control-and-data
 vocabulary needed for the early chapters of [../docs/](../docs/).
 
 ## The sequence
@@ -26,7 +26,8 @@ vocabulary needed for the early chapters of [../docs/](../docs/).
 | 15 | [15-stack-frame](15-stack-frame/)                    | frame-pointer prologue/epilogue, stack locals via `[rbp - N]`             | [docs/15](../docs/15-stack.md)                |
 | 16 | [16-factorial](16-factorial/)                        | recursion — subroutine that calls itself, preserving `n` in `rbx`         | [docs/14](../docs/14-procedures.md)           |
 | 17 | [17-stack-args](17-stack-args/)                      | passing more than six integer args — the extras travel on the stack       | [docs/14](../docs/14-procedures.md)           |
-| 18 | [18-macros](18-macros/)                              | `%macro` for a syscall helper                                             | [docs/17](../docs/17-macros.md)               |
+| 18 | [18-divmod](18-divmod/)                              | returning two values from a subroutine via `rax` + `rdx`                  | [docs/14](../docs/14-procedures.md)           |
+| 19 | [19-macros](19-macros/)                              | `%macro` for a syscall helper                                             | [docs/17](../docs/17-macros.md)               |
 
 Examples 1 and 2 do not have a dedicated chapter — they are the
 smallest possible programs and exist so that every later example can

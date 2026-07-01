@@ -100,6 +100,9 @@ ld add.o -o add
 
 - [examples/03-add/](../examples/03-add/) — the addition program above as a
   complete cross-platform source file. `make && make run`.
+- [examples/18-divmod/](../examples/18-divmod/) — the `div`
+  instruction's dual output (quotient in `rax`, remainder in
+  `rdx`) returned as a two-value subroutine result.
 
 ## Next
 
