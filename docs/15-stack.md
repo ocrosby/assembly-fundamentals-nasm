@@ -56,6 +56,10 @@ If you `call` external code without a prologue, align manually:
 - Calling into `libc` from a misaligned stack often crashes inside SIMD code.
 - The red zone (128 bytes below `rsp`) is yours to scribble in leaf functions; the OS will not clobber it.
 
+## Runnable
+
+- [examples/08-stack-frame/](../examples/08-stack-frame/) — a full frame-pointer prologue and epilogue with two stack locals; steppable under `lldb` or `gdb`.
+
 ## Next
 
 - [System Calls](16-system-calls.md)

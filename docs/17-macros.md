@@ -68,6 +68,10 @@ Split shared definitions into their own file and include them:
 
 Resist using macros to invent a tiny private language; they hide what the CPU actually does, which is the whole point of writing assembly.
 
+## Runnable
+
+- [examples/09-macros/](../examples/09-macros/) — `%macro` hides the `sys_write` and `sys_exit` boilerplate so `_main` reads as three high-level lines.
+
 ## Next
 
 - [Linking](18-linking.md)

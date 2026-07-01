@@ -16,6 +16,8 @@ vocabulary needed for the early chapters of [../docs/](../docs/).
 | 5 | [05-countdown](05-countdown/)                        | local labels, `dec`/`jnz` loop idiom                                      | [docs/13](../docs/13-loops.md)                |
 | 6 | [06-sum-array](06-sum-array/)                        | `.data`, indexed addressing, load-base-then-index                         | [docs/13](../docs/13-loops.md)                |
 | 7 | [07-square](07-square/)                              | `call`/`ret`, System V AMD64 calling convention                           | [docs/14](../docs/14-procedures.md)           |
+| 8 | [08-stack-frame](08-stack-frame/)                    | frame-pointer prologue/epilogue, stack locals via `[rbp - N]`             | [docs/15](../docs/15-stack.md)                |
+| 9 | [09-macros](09-macros/)                              | `%macro` for a syscall helper                                             | [docs/17](../docs/17-macros.md)               |
 
 Examples 1 and 2 do not have a dedicated chapter — they are the
 smallest possible programs and exist so that every later example can
