@@ -29,5 +29,5 @@ Expected: `exit=25`.
 
 ## Next
 
-- [09-macros](../16-macros/) — hide the syscall boilerplate behind
-  `%macro`.
+- [16-factorial](../16-factorial/) — the same subroutine mechanic
+  applied to recursion.

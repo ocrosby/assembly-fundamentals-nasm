@@ -23,7 +23,8 @@ body:
         - examples/13-sum-array
         - examples/14-square
         - examples/15-stack-frame
-        - examples/16-macros
+        - examples/16-factorial
+        - examples/17-macros
     validations:
       required: true
 
