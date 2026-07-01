@@ -35,11 +35,12 @@ A progressive walkthrough of x86-64 assembly with NASM. Each guide is intentiona
 17. [Macros](17-macros.md) — `%define`, `%macro`, conditional assembly.
 18. [Linking](18-linking.md) — `ld`, object files, entry points.
 19. [Debugging](19-debugging.md) — `lldb` and `gdb` basics.
-20. [Cheat Sheet](20-cheat-sheet.md) — quick reference card.
+20. [Cheat Sheet](20-cheat-sheet.md) — x86-64 instructions and registers.
 
 ## Appendix
 
 - [References](21-references.md) — external manuals, instruction-set references, and syscall tables.
+- [NASM Cheat Sheet](22-nasm-cheat-sheet.md) — assembler-specific syntax: directives, preprocessor, storage sizes, literals.
 - [Runnable examples](../examples/) — a constructive sequence of seven small programs paired with chapters 2, 9, 13, and 14.
 
 ## Conventions Used in These Guides
