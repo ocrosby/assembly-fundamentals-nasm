@@ -11,7 +11,7 @@ else
 NASM_FLAGS := -f elf64
 endif
 
-.PHONY: all build clean
+.PHONY: all build test clean
 
 all: $(ARCHIVE)
 
@@ -23,5 +23,12 @@ $(ARCHIVE): $(OBJS)
 %.o: %.asm
 	nasm $(NASM_FLAGS) $< -o $@
 
+# Smoke-test the socket path end to end: build this archive and
+# libasm.a, then run the loopback client/server harness. Requires
+# python3. Invoked via bash so no exec bit is required on run.sh.
+test: $(ARCHIVE)
+	$(MAKE) -C ../asm
+	bash ./test/run.sh
+
 clean:
-	rm -f $(OBJS) $(ARCHIVE)
+	rm -f $(OBJS) $(ARCHIVE) test/tcp-smoke test/tcp-smoke.o

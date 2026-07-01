@@ -118,3 +118,7 @@ jobs:
             fi
           done
           exit "$fail"
+
+      - name: Build and smoke-test the TCP library
+        shell: bash
+        run: make -C libs/tcp test
