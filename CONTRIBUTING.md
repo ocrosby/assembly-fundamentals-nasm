@@ -46,8 +46,9 @@ Summarized here; the authoritative source is [CLAUDE.md](CLAUDE.md).
 - **Required topic shape.** H1 title, one- or two-sentence motivation, H2
   sections as needed, trailing `## Next` link. Appendix files (cheat sheet,
   references) may end with `## See also` linking back to the index.
-- **Platform pairing.** Where Linux and macOS differ, show both side by side
-  under explicit `## Linux` / `## macOS` subheadings.
+- **Platform pairing.** Where macOS and Linux differ, show both under
+  explicit `## macOS` / `## Linux` subheadings — **macOS first**, per
+  the [platform-priority rule](.claude/rules/platform-priority.md).
 - **Terminology.** Use the canonical spellings in CLAUDE.md (x86-64, NASM,
   RFLAGS, System V AMD64 ABI, syscall).
 - **Code blocks.** ` ```nasm ` for assembly, ` ```bash ` for shell, ` ```text `
@@ -72,7 +73,7 @@ Summarized here; the authoritative source is [CLAUDE.md](CLAUDE.md).
 
 1. Place the source under `examples/<topic>/<name>.asm`.
 2. Add a sibling `README.md` showing the exact assemble/link/run commands for
-   Linux and macOS.
+   macOS and Linux.
 3. Link to it from the relevant `docs/NN-*.md`.
 4. Keep examples short and split rather than grow.
 
