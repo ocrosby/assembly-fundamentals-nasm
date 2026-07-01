@@ -1,0 +1,82 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  link-check:
+    name: Markdown link check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Restore lychee cache
+        uses: actions/cache@v4
+        with:
+          path: .lycheecache
+          key: cache-lychee-${{ github.sha }}
+          restore-keys: cache-lychee-
+
+      - name: Run lychee
+        uses: lycheeverse/lychee-action@v2
+        with:
+          args: >-
+            --cache
+            --no-progress
+            --exclude-path .lycheeignore
+            --exclude-file .lycheeignore
+            './**/*.md'
+          fail: true
+
+  examples-build:
+    name: Build and run every example
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install NASM and binutils
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends nasm binutils
+
+      - name: Build and run every existing example
+        shell: bash
+        run: |
+          set -e
+          declare -A expected=(
+            [01-exit-zero]=0
+            [02-exit-status]=42
+            [03-add]=12
+            [04-hello]=0
+            [05-countdown]=0
+            [06-sum-array]=150
+            [07-square]=49
+            [08-stack-frame]=25
+            [09-macros]=42
+          )
+          fail=0
+          for dir in "${!expected[@]}"; do
+            path="examples/$dir"
+            if [ ! -d "$path" ]; then
+              printf "SKIP: %s (directory not present)\n" "$dir"
+              continue
+            fi
+            bin=$(echo "$dir" | sed 's/^[0-9][0-9]-//')
+            ( cd "$path" && make clean >/dev/null && make all >/dev/null )
+            "./$path/$bin" >/dev/null || true
+            got=$?
+            want=${expected[$dir]}
+            if [ "$got" -eq "$want" ]; then
+              printf "OK  : %-20s exit=%d\n" "$dir" "$got"
+            else
+              printf "FAIL: %-20s exit=%d (want %d)\n" "$dir" "$got" "$want"
+              fail=1
+            fi
+          done
+          exit "$fail"

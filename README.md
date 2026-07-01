@@ -2,6 +2,7 @@
 
 A hands-on reference for learning x86-64 assembly with the Netwide Assembler (NASM).
 
+![CI](https://github.com/ocrosby/assembly-fundamentals-nasm/actions/workflows/ci.yml/badge.svg)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Assembler: NASM](https://img.shields.io/badge/assembler-NASM-blue.svg)](https://www.nasm.us/)
 [![Architecture: x86--64](https://img.shields.io/badge/arch-x86--64-lightgrey.svg)](https://en.wikipedia.org/wiki/X86-64)
