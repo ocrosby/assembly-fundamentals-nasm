@@ -1,0 +1,8 @@
+# The `NN-next.md` placeholder inside CLAUDE.md's required-topic-file
+# example is illustrative, not a real link — the surrounding block is
+# a ```markdown code sample, not prose.
+NN-next\.md
+
+# Local build artifacts referenced from example READMEs (they are
+# produced at build time and never committed).
+examples/[0-9][0-9]-[a-z-]*/[a-z-]+$
