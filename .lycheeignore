@@ -6,3 +6,8 @@ NN-next\.md
 # Local build artifacts referenced from example READMEs (they are
 # produced at build time and never committed).
 examples/[0-9][0-9]-[a-z-]*/[a-z-]+$
+
+# OSDev wiki rejects lychee's default user agent with 403. Content is
+# live — verified in a browser — so the block is a UA-level rate limit,
+# not a real dead link.
+^https?://wiki\.osdev\.org/

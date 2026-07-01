@@ -69,8 +69,8 @@ jobs:
             fi
             bin=$(echo "$dir" | sed 's/^[0-9][0-9]-//')
             ( cd "$path" && make clean >/dev/null && make all >/dev/null )
-            "./$path/$bin" >/dev/null || true
-            got=$?
+            got=0
+            "./$path/$bin" >/dev/null || got=$?
             want=${expected[$dir]}
             if [ "$got" -eq "$want" ]; then
               printf "OK  : %-20s exit=%d\n" "$dir" "$got"
