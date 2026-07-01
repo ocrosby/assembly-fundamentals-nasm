@@ -63,6 +63,13 @@ otool -tV ./prog                # disassemble (macOS)
 objdump -d ./prog               # disassemble (Linux)
 ```
 
+## Runnable
+
+- [examples/20-shared-lib/](../examples/20-shared-lib/) — call
+  `puts` from `libSystem`/`libc`, demonstrating `extern`, macOS
+  symbol underscore mangling, and the switch from `ld` to `gcc`
+  on Linux so `libc` gets initialized before the call.
+
 ## Common errors
 
 - `undefined reference to '_start'` → entry symbol missing `global`, or wrong name for the platform.
