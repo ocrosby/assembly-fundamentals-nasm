@@ -37,5 +37,6 @@ Expected: `exit=36`.
 
 ## Next
 
-- [18-macros](../18-macros/) — `%macro` hides the syscall
-  boilerplate that shows up in every example so far.
+- [18-divmod](../18-divmod/) — return two values from a
+  subroutine at once, using both of the ABI's return-value slots
+  (`rax` and `rdx`).

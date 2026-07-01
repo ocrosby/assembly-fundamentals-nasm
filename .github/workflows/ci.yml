@@ -80,7 +80,8 @@ jobs:
             [15-stack-frame]=25
             [16-factorial]=120
             [17-stack-args]=36
-            [18-macros]=42
+            [18-divmod]=32
+            [19-macros]=42
           )
           # Examples that read from stdin get an empty pipe so they hit
           # EOF immediately and exit 0 without waiting for a TTY.

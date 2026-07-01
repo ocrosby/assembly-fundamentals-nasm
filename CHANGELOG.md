@@ -8,6 +8,20 @@ The repository is unversioned — only the tip of `main` is maintained
 
 ## Unreleased
 
+- Add `examples/18-divmod/` — a subroutine that returns **two**
+  values at once. `divmod(17, 5)` puts the quotient in `rax` and
+  the remainder in `rdx` using the ABI's two return-value slots,
+  then the caller combines them into a 32 exit status. Introduces
+  the fact that the System V AMD64 ABI reserves both `rax` and
+  `rdx` for returns, and the natural pairing with the `div`
+  instruction which writes both halves in a single cycle. Renames
+  the previous `18-macros` to `19-macros`. `docs/17-macros.md`
+  Runnable pointer, `docs/14-procedures.md` (gains a fourth
+  Runnable entry alongside 14-square, 16-factorial, and
+  17-stack-args), `docs/09-arithmetic.md` (gains its second
+  Runnable pointer, next to 03-add), the CI expected-exit table,
+  and the issue-template dropdown are all updated to match.
+
 - Add `examples/17-stack-args/` — pass eight integer args to
   `sum8(a..h)`. Introduces the six-register cap of the System V
   AMD64 ABI, the right-to-left push order for args 7+, callee-

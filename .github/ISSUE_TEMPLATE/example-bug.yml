@@ -25,7 +25,8 @@ body:
         - examples/15-stack-frame
         - examples/16-factorial
         - examples/17-stack-args
-        - examples/18-macros
+        - examples/18-divmod
+        - examples/19-macros
     validations:
       required: true
 
