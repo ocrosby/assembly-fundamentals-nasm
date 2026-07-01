@@ -1,8 +1,10 @@
 # System Calls
 
-A syscall asks the kernel to do something — read, write, exit. The convention differs between Linux and macOS.
+A syscall asks the kernel to do something — read, write, exit. Linux and macOS share the register convention for arguments and return, but their syscall numbers differ.
 
-## Linux
+## Register convention
+
+Both platforms follow the same layout for the `syscall` instruction:
 
 | Register | Purpose                       |
 |----------|-------------------------------|
@@ -17,24 +19,6 @@ A syscall asks the kernel to do something — read, write, exit. The convention 
 
 `rcx` and `r11` are clobbered by the `syscall` instruction.
 
-Common numbers (from `/usr/include/asm/unistd_64.h`):
-
-| Name       | Number | Args              |
-|------------|--------|-------------------|
-| `read`     | 0      | fd, buf, count    |
-| `write`    | 1      | fd, buf, count    |
-| `open`     | 2      | path, flags, mode |
-| `close`    | 3      | fd                |
-| `exit`     | 60     | status            |
-
-```nasm
-    mov rax, 1
-    mov rdi, 1
-    mov rsi, msg
-    mov rdx, msg_len
-    syscall                  ; write(1, msg, msg_len)
-```
-
 ## macOS
 
 macOS sets the **high byte** of `rax` to the syscall class and the low bytes to the call number. For BSD calls (which is what you want for `write`/`exit`), that prefix is `0x2000000`.
@@ -45,14 +29,34 @@ macOS sets the **high byte** of `rax` to the syscall class and the low bytes to 
 | `exit`     | `0x2000001`        | status            |
 
 ```nasm
-    mov rax, 0x2000004
-    mov rdi, 1
+    mov rax, 0x2000004               ; sys_write
+    mov rdi, 1                       ; fd = stdout
     lea rsi, [rel msg]
     mov rdx, msg_len
     syscall
 ```
 
 Apple discourages direct syscalls and may break them between macOS releases. For anything beyond a toy, link `libSystem` and call `write`, `exit`, etc., as ordinary functions. See [Linking](18-linking.md).
+
+## Linux
+
+Numbers come from `/usr/include/asm/unistd_64.h`:
+
+| Name       | Number | Args              |
+|------------|--------|-------------------|
+| `read`     | 0      | fd, buf, count    |
+| `write`    | 1      | fd, buf, count    |
+| `open`     | 2      | path, flags, mode |
+| `close`    | 3      | fd                |
+| `exit`     | 60     | status            |
+
+```nasm
+    mov rax, 1                       ; sys_write
+    mov rdi, 1
+    mov rsi, msg
+    mov rdx, msg_len
+    syscall
+```
 
 ## Errors
 
