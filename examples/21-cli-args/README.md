@@ -52,5 +52,7 @@ provides the same service via `libSystem`'s startup code.
 
 ## Next
 
-- [22-macros](../22-macros/) — `%macro` hides the syscall
-  boilerplate that shows up in every example so far.
+- [22-struct-return](../22-struct-return/) — return a struct
+  bigger than 16 bytes from a subroutine — the ABI hides an
+  extra pointer arg in `rdi` and shifts every other arg one
+  register to the right.

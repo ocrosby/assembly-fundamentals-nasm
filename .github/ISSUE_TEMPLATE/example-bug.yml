@@ -29,7 +29,8 @@ body:
         - examples/19-struct-ptr
         - examples/20-shared-lib
         - examples/21-cli-args
-        - examples/22-macros
+        - examples/22-struct-return
+        - examples/23-macros
     validations:
       required: true
 

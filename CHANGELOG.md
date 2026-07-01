@@ -8,6 +8,22 @@ The repository is unversioned — only the tip of `main` is maintained
 
 ## Unreleased
 
+- Add `examples/22-struct-return/` — return a 32-byte
+  `struct rect { x, y, w, h }` by value. Because the return type
+  is too big for the register-pair convention that 18-divmod
+  uses, the ABI silently switches to a "return by hidden pointer"
+  convention: the caller reserves 32 bytes on the stack, passes a
+  pointer to that space as a hidden first arg in `rdi`, and the
+  callee writes each field through it. Every programmer-visible
+  arg (x, y, w, h) shifts one register to the right (rsi, rdx,
+  rcx, r8). The callee returns the same pointer unchanged in
+  `rax`. `make_rect(10, 20, 30, 40)` — the caller sums the four
+  fields back and exits with 100. Renames the previous
+  `22-macros` to `23-macros`. Docs (`17-macros.md` Runnable
+  pointer, `14-procedures.md` gains a seventh Runnable entry),
+  CI expected-exit table, and the issue-template dropdown are
+  all updated to match.
+
 - Add `examples/21-cli-args/` — read command-line arguments.
   The runtime hands `argc` to `rdi` and `argv` to `rsi` per the
   standard C `main(int, char**)` signature; the example prints
