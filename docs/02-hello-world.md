@@ -5,26 +5,52 @@ The smallest complete program: write a string to stdout and exit.
 ## Source — `hello.asm`
 
 ```nasm
+%ifdef MACOS
+%define SYS_WRITE 0x2000004
+%define SYS_EXIT  0x2000001
+%else
+%define SYS_WRITE 1
+%define SYS_EXIT  60
+%endif
+
+default rel
 global _start
+global _main
 
 section .text
-_start:
-    mov rax, 1               ; sys_write
-    mov rdi, 1               ; fd = stdout
-    mov rsi, msg             ; buffer
-    mov rdx, msg_len         ; length
-    syscall
 
-    mov rax, 60              ; sys_exit
-    xor rdi, rdi             ; status = 0
-    syscall
+_start:
+_main:
+    mov rax, SYS_WRITE               ; syscall number
+    mov rdi, 1                       ; arg 1: fd = stdout
+    lea rsi, [msg]                   ; arg 2: buffer
+    mov rdx, msg_len                 ; arg 3: length
+    syscall                          ; sys_write(stdout, msg, msg_len)
+
+    mov rax, SYS_EXIT
+    xor rdi, rdi                     ; status = 0
+    syscall                          ; sys_exit(0)
 
 section .rodata
 msg: db "Hello, world!", 10
 msg_len: equ $ - msg
 ```
 
-The example above uses Linux syscall numbers. On macOS, see [System Calls](16-system-calls.md).
+The `%ifdef MACOS` block picks the right syscall numbers per platform, and both `_start` and `_main` are declared as globals so the source works with either linker's default entry symbol. See [System Calls](16-system-calls.md) for the syscall table.
+
+## Build and run — macOS
+
+macOS programs link against `libSystem`. See [Linking](18-linking.md) for the full story.
+
+```bash
+nasm -f macho64 -DMACOS hello.asm -o hello.o
+ld -macos_version_min 11.0 -lSystem -o hello hello.o \
+   -syslibroot "$(xcrun -sdk macosx --show-sdk-path)"
+./hello
+# Hello, world!
+```
+
+On Apple Silicon the resulting x86-64 binary runs under Rosetta; install with `softwareupdate --install-rosetta` if it is not already present.
 
 ## Build and run — Linux
 
@@ -35,21 +61,9 @@ ld hello.o -o hello
 # Hello, world!
 ```
 
-## Build and run — macOS
-
-macOS programs link against `libSystem` and use a different entry point. See [System Calls](16-system-calls.md) and [Linking](18-linking.md) for the full story.
-
-```bash
-nasm -f macho64 hello.asm -o hello.o
-ld -macos_version_min 11.0 -lSystem -o hello hello.o \
-   -syslibroot "$(xcrun -sdk macosx --show-sdk-path)"
-./hello
-```
-
 ## Runnable
 
-- [examples/04-hello/](../examples/04-hello/) — `make && make run`. Cross-platform
-  source with the syscall numbers swapped by `%ifdef MACOS`.
+- [examples/04-hello/](../examples/04-hello/) — this same program with a `Makefile` that auto-detects the platform. `make && make run`.
 
 ## Next
 
