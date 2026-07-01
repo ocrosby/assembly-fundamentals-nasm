@@ -1,8 +1,8 @@
-# 19 — macros
+# 20 — macros
 
 Use `%macro` to hide the sys_write and sys_exit boilerplate, then
 write `Hello, world!` and exit with status 42 using just three lines
-of body code in `_main`. Builds on [18-divmod](../18-divmod/)
+of body code in `_main`. Builds on [19-struct-ptr](../19-struct-ptr/)
 by introducing NASM's preprocessor macros.
 
 ## Introduces

@@ -43,5 +43,6 @@ quotient in `rax` and the remainder in `rdx` came back intact).
 
 ## Next
 
-- [19-macros](../19-macros/) — `%macro` hides the syscall
-  boilerplate that shows up in every example so far.
+- [19-struct-ptr](../19-struct-ptr/) — pass a whole struct
+  to a subroutine by pointer, mutate its fields in place, read
+  the mutated values back.

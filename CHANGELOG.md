@@ -8,6 +8,19 @@ The repository is unversioned — only the tip of `main` is maintained
 
 ## Unreleased
 
+- Add `examples/19-struct-ptr/` — pass a `struct point` to a
+  subroutine by pointer. `translate(&pt, 3, 4)` mutates both
+  fields in place; the caller reads them back and exits with
+  `pt.x + pt.y = 37`. Introduces structs as contiguous memory
+  addressed via `equ` field-offset constants, passing by pointer,
+  mutation-through-pointer, and the `add [mem], reg` RMW form
+  that reads, modifies, and writes in one instruction. Renames
+  the previous `19-macros` to `20-macros`. Docs (`17-macros.md`
+  Runnable, `14-procedures.md` gains a fifth Runnable entry,
+  `07-addressing-modes.md` gets its first Runnable section
+  pointing at this example), CI expected-exit table, and the
+  issue-template dropdown are all updated to match.
+
 - Add `examples/18-divmod/` — a subroutine that returns **two**
   values at once. `divmod(17, 5)` puts the quotient in `rax` and
   the remainder in `rdx` using the ABI's two return-value slots,
