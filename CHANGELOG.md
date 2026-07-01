@@ -8,6 +8,21 @@ The repository is unversioned — only the tip of `main` is maintained
 
 ## Unreleased
 
+- Add `examples/20-shared-lib/` — call `puts` from the C library.
+  Introduces `extern` for imported symbols, macOS's leading-
+  underscore symbol mangling (`_puts` in the Mach-O symbol table),
+  entering through `main`/`_main` (not `_start`) so the runtime
+  can call `exit()` with the return value, and the `sub rsp, 8`
+  pre-alignment that keeps `rsp` 16-byte-aligned at the moment of
+  `call`. Includes a per-platform link recipe: macOS keeps `ld
+  -lSystem`; Linux switches to `gcc` as the driver so `crt0`
+  initializes `libc` before `puts` runs. Renames the previous
+  `20-macros` to `21-macros`. Docs (`17-macros.md` Runnable
+  pointer, `18-linking.md` gets a new Runnable section pointing at
+  this example), CI expected-exit table and Linux install step
+  (adds `gcc libc6-dev`), and the issue-template dropdown are all
+  updated to match.
+
 - Add `examples/19-struct-ptr/` — pass a `struct point` to a
   subroutine by pointer. `translate(&pt, 3, 4)` mutates both
   fields in place; the caller reads them back and exits with

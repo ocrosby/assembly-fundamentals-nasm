@@ -27,7 +27,8 @@ body:
         - examples/17-stack-args
         - examples/18-divmod
         - examples/19-struct-ptr
-        - examples/20-macros
+        - examples/20-shared-lib
+        - examples/21-macros
     validations:
       required: true
 

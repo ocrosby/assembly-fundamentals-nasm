@@ -44,5 +44,6 @@ Expected: `exit=37` (= `13 + 24`, the mutated `pt.x + pt.y`).
 
 ## Next
 
-- [20-macros](../20-macros/) — `%macro` hides the syscall
-  boilerplate that shows up in every example so far.
+- [20-shared-lib](../20-shared-lib/) — call a function from
+  a shared library (`puts` from libc) instead of driving the
+  write syscall by hand.

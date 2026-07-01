@@ -52,7 +52,7 @@ jobs:
         if: runner.os == 'Linux'
         run: |
           sudo apt-get update
-          sudo apt-get install -y --no-install-recommends nasm binutils
+          sudo apt-get install -y --no-install-recommends nasm binutils gcc libc6-dev
 
       - name: Build and run every existing example
         shell: bash
@@ -82,7 +82,8 @@ jobs:
             [17-stack-args]=36
             [18-divmod]=32
             [19-struct-ptr]=37
-            [20-macros]=42
+            [20-shared-lib]=0
+            [21-macros]=42
           )
           # Examples that read from stdin get an empty pipe so they hit
           # EOF immediately and exit 0 without waiting for a TTY.
