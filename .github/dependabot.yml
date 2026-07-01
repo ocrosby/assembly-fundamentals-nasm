@@ -1,0 +1,17 @@
+version: 2
+updates:
+  # Keep the pinned GitHub Actions SHAs current. Each new PR carries
+  # the new SHA and a comment naming the release tag it points at, so
+  # the CI supply chain stays fresh without hand-editing.
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "chore(deps)"
+      include: "scope"
+    labels:
+      - "dependencies"
+      - "github-actions"
