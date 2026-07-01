@@ -28,7 +28,8 @@ body:
         - examples/18-divmod
         - examples/19-struct-ptr
         - examples/20-shared-lib
-        - examples/21-macros
+        - examples/21-cli-args
+        - examples/22-macros
     validations:
       required: true
 

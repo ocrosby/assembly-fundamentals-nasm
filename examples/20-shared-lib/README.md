@@ -49,5 +49,6 @@ resolves `_main` as the default entry.
 
 ## Next
 
-- [21-macros](../21-macros/) — `%macro` hides the syscall
-  boilerplate that shows up in every example so far.
+- [21-cli-args](../21-cli-args/) — read `argc` / `argv` from
+  the standard `main` argument registers and observe what the
+  runtime that just called us knows about our command line.

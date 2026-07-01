@@ -8,6 +8,23 @@ The repository is unversioned — only the tip of `main` is maintained
 
 ## Unreleased
 
+- Add `examples/21-cli-args/` — read command-line arguments.
+  The runtime hands `argc` to `rdi` and `argv` to `rsi` per the
+  standard C `main(int, char**)` signature; the example prints
+  `argv[0]` (the program's own path) via `sys_write` and returns
+  `argc` as the exit status. Introduces `argv` as a pointer to an
+  array of `char *` pointers indexed at `[rsi + i * 8]`, one
+  `mov rsi, [rsi]` dereference to reach the first string, and
+  stashing state in `r10` (caller-saved, untouched by `syscall`)
+  to survive across two write syscalls without pushing anything.
+  Reuses 20-shared-lib's per-platform link recipe — macOS keeps
+  `ld -lSystem`; Linux uses `gcc` as the driver so `crt0` unpacks
+  the kernel-supplied stack layout into argument registers before
+  calling us. Renames the previous `21-macros` to `22-macros`.
+  Docs (`17-macros.md` Runnable pointer, `14-procedures.md` gains
+  a sixth Runnable entry), CI expected-exit table, and the
+  issue-template dropdown are all updated to match.
+
 - Add `examples/20-shared-lib/` — call `puts` from the C library.
   Introduces `extern` for imported symbols, macOS's leading-
   underscore symbol mangling (`_puts` in the Mach-O symbol table),
