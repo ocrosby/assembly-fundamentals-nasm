@@ -11,6 +11,49 @@ The repository is unversioned — only the tip of `main` is maintained
 - Placeholder for changes on `main` since the last dated section
   below. Move to a dated section when the batch settles.
 
+## 2026-07 — Audit follow-up, CI hardening, community files
+
+### Added
+
+- `SECURITY.md` — scope statement, private-report path (GitHub
+  Security tab + email fallback), unversioned support statement.
+  Also unlocks the "Security policy" badge on the repo landing
+  page. (#26)
+- `.github/PULL_REQUEST_TEMPLATE.md` — the Summary + Test plan
+  shape every recent PR body has used, now templated so a new
+  contributor does not have to notice the pattern to match it. (#26)
+- `.github/ISSUE_TEMPLATE/`: `config.yml` (disables blank issues,
+  points at CONTRIBUTING and SECURITY), `doc-bug.yml`, and
+  `example-bug.yml` — required-field forms that mirror the exact
+  info the "Reporting bugs" section of CONTRIBUTING already asks
+  for. (#26)
+- `.github/dependabot.yml` — weekly `github-actions` ecosystem PRs
+  so the SHA pins stay current. (#25)
+- `CHANGELOG.md` — Keep-a-Changelog-formatted history file, seeded
+  with the June 2026 section, plus a `## Changelog` pointer in
+  the README. (#27)
+- CI: `macos-latest` matrix leg on `examples-build`, so the Mach-O
+  + libSystem link path gets exercised the same way a reader
+  actually uses it (macOS is the primary target). (#25, #30)
+
+### Changed
+
+- Every GitHub Action in `.github/workflows/ci.yml` is now pinned
+  to a full 40-char commit SHA with a `# vX.Y.Z` trailing comment.
+  This is the concrete mitigation for the OWASP A03 supply-chain
+  signal. (#25)
+- `actions/cache` bumped 4.3.0 → 6.1.0 via Dependabot. (#28)
+- `actions/checkout` bumped 4.3.1 → 7.0.0 via Dependabot. (#29)
+- Stale count references in `README.md` and `docs/README.md`
+  updated from "seven runnable programs" to "nine", with the
+  chapter-pairing list expanded to 2, 9, 13, 14, 15, and 17. (#24)
+
+### Fixed
+
+- Switch CI matrix from `macos-13` (Intel image, retired by GitHub
+  in early 2026) to `macos-latest` — jobs were queuing forever
+  waiting on a runner label whose pool had been decommissioned. (#30)
+
 ## 2026-06 — Initial documentation, examples, and CI
 
 ### Added
