@@ -8,6 +8,15 @@ The repository is unversioned — only the tip of `main` is maintained
 
 ## Unreleased
 
+- Add `examples/16-factorial/` — recursion. `factorial(5) = 120`
+  computed by a subroutine that calls itself, preserving `n` in
+  `rbx` (callee-saved) across the recursive call. Renames the
+  previous `16-macros` to `17-macros` to keep the constructive
+  sequence intact; `docs/17-macros.md` Runnable pointer, CI
+  expected-exit table, and the issue-template dropdown are updated
+  to match. `docs/14-procedures.md` gains a second Runnable entry
+  pointing at the recursion example alongside the existing 14-square.
+
 - Expand `examples/` into a full I/O curriculum. Old `04-hello`
   removed; eight new examples land at 04–11 covering
   `sys_write`/`sys_read` at char and line granularities, an

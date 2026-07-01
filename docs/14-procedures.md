@@ -54,6 +54,9 @@ Calling it:
 
 - [examples/14-square/](../examples/14-square/) — `square` called from `_main`
   with the result returned as the exit status. `make && make run`.
+- [examples/16-factorial/](../examples/16-factorial/) — recursion:
+  a subroutine that calls itself, preserving its argument in `rbx`
+  across the recursive call.
 
 ## Next
 
