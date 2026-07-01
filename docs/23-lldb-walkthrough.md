@@ -4,7 +4,8 @@ A step-by-step tour of debugging a small NASM program under `lldb` on
 macOS. The target is [`examples/07-square`](../examples/07-square/),
 which is small enough to step through end-to-end, and rich enough to
 show a `call`, a `ret`, and a return value flowing back through the
-System V AMD64 ABI.
+System V AMD64 ABI. For the Linux counterpart, see
+[gdb Walkthrough](24-gdb-walkthrough.md) — same target, same flow.
 
 For the reference-level `lldb` command list, see
 [Debugging](19-debugging.md). This chapter is the walkthrough.
@@ -153,6 +154,7 @@ into `rip`.
 
 ## See also
 
+- [gdb Walkthrough](24-gdb-walkthrough.md) — the Linux counterpart.
 - [Debugging](19-debugging.md) — reference-level `lldb` and `gdb` commands.
 - [Procedures](14-procedures.md) — the calling convention this walkthrough follows.
 - [The Stack](15-stack.md) — what `call` and `ret` do to `rsp`.
