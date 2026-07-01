@@ -72,6 +72,10 @@ Calling it:
   standard C `main(int argc, char **argv)` arguments straight out
   of `rdi` and `rsi`, and index the array-of-pointers `argv` to
   reach the strings.
+- [examples/22-struct-return/](../examples/22-struct-return/) —
+  return a `struct` by value that is too big for register-pair
+  returns. The ABI hides a caller-provided pointer in `rdi` and
+  shifts every visible arg one register to the right.
 
 ## Next
 

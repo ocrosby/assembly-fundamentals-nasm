@@ -2,7 +2,7 @@
 
 A constructive sequence of small x86-64 NASM programs. Each example
 introduces exactly one new atomic concept on top of the previous one,
-so reading from `01` to `22` walks the entire control-and-data
+so reading from `01` to `23` walks the entire control-and-data
 vocabulary needed for the early chapters of [../docs/](../docs/).
 
 ## The sequence
@@ -30,7 +30,8 @@ vocabulary needed for the early chapters of [../docs/](../docs/).
 | 19 | [19-struct-ptr](19-struct-ptr/)                      | passing a struct by pointer, mutating fields in place via `[reg+off]`     | [docs/14](../docs/14-procedures.md)           |
 | 20 | [20-shared-lib](20-shared-lib/)                      | calling `puts` from libc/libSystem — `extern`, symbol underscore mangling | [docs/18](../docs/18-linking.md)              |
 | 21 | [21-cli-args](21-cli-args/)                          | reading `argc`/`argv` from `main`, dereferencing an array-of-pointers     | [docs/14](../docs/14-procedures.md)           |
-| 22 | [22-macros](22-macros/)                              | `%macro` for a syscall helper                                             | [docs/17](../docs/17-macros.md)               |
+| 22 | [22-struct-return](22-struct-return/)                | returning a struct by value >16 bytes — ABI hides a pointer in `rdi`      | [docs/14](../docs/14-procedures.md)           |
+| 23 | [23-macros](23-macros/)                              | `%macro` for a syscall helper                                             | [docs/17](../docs/17-macros.md)               |
 
 Examples 1 and 2 do not have a dedicated chapter — they are the
 smallest possible programs and exist so that every later example can

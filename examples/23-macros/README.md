@@ -1,8 +1,8 @@
-# 22 — macros
+# 23 — macros
 
 Use `%macro` to hide the sys_write and sys_exit boilerplate, then
 write `Hello, world!` and exit with status 42 using just three lines
-of body code in `_main`. Builds on [21-cli-args](../21-cli-args/)
+of body code in `_main`. Builds on [22-struct-return](../22-struct-return/)
 by introducing NASM's preprocessor macros.
 
 ## Introduces
