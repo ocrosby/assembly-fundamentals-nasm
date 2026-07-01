@@ -68,6 +68,10 @@ Calling it:
   struct by pointer instead of packing every field into its own
   arg register. The callee mutates the struct's fields through
   the pointer; the caller reads them back the same way.
+- [examples/21-cli-args/](../examples/21-cli-args/) — read the
+  standard C `main(int argc, char **argv)` arguments straight out
+  of `rdi` and `rsi`, and index the array-of-pointers `argv` to
+  reach the strings.
 
 ## Next
 
