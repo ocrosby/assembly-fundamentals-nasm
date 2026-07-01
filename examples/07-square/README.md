@@ -27,4 +27,5 @@ Expected: `exit=49`.
 
 ## Next
 
-- Back to [examples/README.md](../README.md).
+- [08-stack-frame](../08-stack-frame/) — promote the leaf function
+  into one with a full stack frame and stack locals.
