@@ -36,11 +36,11 @@ purpose so a single concept fits on one screen.
 
 ## Requirements
 
-- A 64-bit x86 host (Linux or macOS; Windows via WSL2).
+- A 64-bit x86 host (macOS or Linux; Windows via WSL2).
 - [NASM](https://www.nasm.us/) `>= 2.15` — see the
   [NASM Manual](https://www.nasm.us/doc/) for syntax and directives.
-- A linker (`ld` on Linux, `ld` from Xcode Command Line Tools on macOS).
-- A debugger — `gdb` on Linux, `lldb` on macOS — for the debugging guide.
+- A linker (`ld` from Xcode Command Line Tools on macOS, `ld` on Linux).
+- A debugger — `lldb` on macOS, `gdb` on Linux — for the debugging guide.
 - Optional: `make` for any local build scripts you add.
 
 ## Installation
@@ -48,15 +48,15 @@ purpose so a single concept fits on one screen.
 Install NASM and a linker for your platform.
 
 ```bash
+# macOS (Homebrew)
+xcode-select --install
+brew install nasm
+
 # Debian / Ubuntu
 sudo apt-get update && sudo apt-get install -y nasm build-essential gdb
 
 # Fedora
 sudo dnf install -y nasm binutils gdb
-
-# macOS (Homebrew)
-xcode-select --install
-brew install nasm
 ```
 
 Clone this repository:
@@ -75,20 +75,20 @@ Read the docs in order, starting with the index:
 - [docs/02-hello-world.md](docs/02-hello-world.md) — assemble, link, and run.
 - [docs/21-references.md](docs/21-references.md) — external manuals and reference sites.
 - [examples/](examples/) — a constructive sequence of seven runnable programs,
-  each with a `Makefile` that auto-detects Linux and macOS.
+  each with a `Makefile` that auto-detects macOS and Linux.
 
 Assemble, link, and run any example from a guide:
 
 ```bash
-# Linux (ELF64)
-nasm -f elf64 hello.asm -o hello.o
-ld hello.o -o hello
-./hello
-
 # macOS (Mach-O 64)
 nasm -f macho64 hello.asm -o hello.o
 ld -macos_version_min 11.0 -lSystem -o hello hello.o \
    -syslibroot "$(xcrun -sdk macosx --show-sdk-path)"
+./hello
+
+# Linux (ELF64)
+nasm -f elf64 hello.asm -o hello.o
+ld hello.o -o hello
 ./hello
 ```
 
