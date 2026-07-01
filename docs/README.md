@@ -37,6 +37,12 @@ A progressive walkthrough of x86-64 assembly with NASM. Each guide is intentiona
 19. [Debugging](19-debugging.md) — `lldb` and `gdb` basics.
 20. [Cheat Sheet](20-cheat-sheet.md) — x86-64 instructions and registers.
 
+## Extended coverage
+
+- [Floating Point](25-floating-point.md) — scalar single and double
+  arithmetic on the SSE `xmm` registers, calling convention, and
+  int↔float conversion.
+
 ## Appendix
 
 - [References](21-references.md) — external manuals, instruction-set references, and syscall tables.
