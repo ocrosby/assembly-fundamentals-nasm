@@ -5,10 +5,10 @@ One-page reference. Each row links to the chapter that explains it.
 ## Build
 
 ```bash
-nasm -f elf64   -g -F dwarf  file.asm -o file.o   # Linux
 nasm -f macho64 -g -F dwarf  file.asm -o file.o   # macOS
-ld file.o -o file                                  # Linux
+nasm -f elf64   -g -F dwarf  file.asm -o file.o   # Linux
 clang file.o -o file                               # macOS (links libSystem)
+ld file.o -o file                                  # Linux
 ```
 
 See [Linking](18-linking.md).
@@ -72,8 +72,8 @@ See [Comparison & Flags](11-comparison.md), [Jumps](12-jumps.md), [Procedures](1
 
 | Platform | `rax` for `write` | `rax` for `exit` |
 |----------|-------------------|------------------|
-| Linux    | `1`               | `60`             |
 | macOS    | `0x2000004`       | `0x2000001`      |
+| Linux    | `1`               | `60`             |
 
 See [System Calls](16-system-calls.md).
 

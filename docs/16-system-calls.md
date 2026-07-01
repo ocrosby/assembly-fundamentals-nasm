@@ -1,6 +1,6 @@
 # System Calls
 
-A syscall asks the kernel to do something — read, write, exit. Linux and macOS share the register convention for arguments and return, but their syscall numbers differ.
+A syscall asks the kernel to do something — read, write, exit. macOS and Linux share the register convention for arguments and return, but their syscall numbers differ.
 
 ## Register convention
 

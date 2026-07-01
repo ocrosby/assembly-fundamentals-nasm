@@ -14,7 +14,7 @@ my_proc: ; ... body ...
 
 `call` pushes the address of the next instruction; `ret` pops it back into `rip`.
 
-## System V AMD64 calling convention (Linux, macOS)
+## System V AMD64 calling convention (macOS, Linux)
 
 | Role | Registers |
 |------|-----------|

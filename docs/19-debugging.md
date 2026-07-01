@@ -5,14 +5,30 @@ Step through your program, inspect registers, and find the line where things wen
 ## Assemble with debug info
 
 ```bash
-nasm -f elf64   -g -F dwarf hello.asm -o hello.o   # Linux
 nasm -f macho64 -g -F dwarf hello.asm -o hello.o   # macOS
+nasm -f elf64   -g -F dwarf hello.asm -o hello.o   # Linux
 ld hello.o -o hello
 ```
 
 `-g -F dwarf` embeds source-line information so the debugger can map instructions back to your `.asm` file.
 
-## `gdb` (Linux) — minimum useful session
+## `lldb` (macOS) — minimum useful session
+
+```bash
+lldb ./hello
+```
+
+```
+(lldb) breakpoint set --name _main
+(lldb) run
+(lldb) register read
+(lldb) memory read --size 1 --count 16 --format x &msg
+(lldb) thread step-inst
+(lldb) continue
+(lldb) quit
+```
+
+## `gdb` (Linux) — equivalent session
 
 ```bash
 gdb ./hello
@@ -35,22 +51,6 @@ Switch to Intel syntax once per session:
 
 ```
 (gdb) set disassembly-flavor intel
-```
-
-## `lldb` (macOS) — equivalent session
-
-```bash
-lldb ./hello
-```
-
-```
-(lldb) breakpoint set --name _main
-(lldb) run
-(lldb) register read
-(lldb) memory read --size 1 --count 16 --format x &msg
-(lldb) thread step-inst
-(lldb) continue
-(lldb) quit
 ```
 
 ## Quick checks without a debugger

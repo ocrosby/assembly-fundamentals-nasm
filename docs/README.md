@@ -31,10 +31,10 @@ A progressive walkthrough of x86-64 assembly with NASM. Each guide is intentiona
 
 ## Going Further
 
-16. [System Calls](16-system-calls.md) — Linux vs macOS conventions.
+16. [System Calls](16-system-calls.md) — macOS vs Linux conventions.
 17. [Macros](17-macros.md) — `%define`, `%macro`, conditional assembly.
 18. [Linking](18-linking.md) — `ld`, object files, entry points.
-19. [Debugging](19-debugging.md) — `gdb` and `lldb` basics.
+19. [Debugging](19-debugging.md) — `lldb` and `gdb` basics.
 20. [Cheat Sheet](20-cheat-sheet.md) — quick reference card.
 
 ## Appendix
@@ -45,5 +45,5 @@ A progressive walkthrough of x86-64 assembly with NASM. Each guide is intentiona
 ## Conventions Used in These Guides
 
 - Examples target **x86-64** (long mode), **Intel syntax** (NASM default).
-- Platform differences are called out under **Linux** and **macOS** subheadings.
+- Platform differences are called out under **macOS** and **Linux** subheadings.
 - Code is given as it would be saved in a `.asm` file; assemble with `nasm` and link with `ld` as shown in [Hello World](02-hello-world.md).

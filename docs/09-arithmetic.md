@@ -43,7 +43,7 @@ The two- and three-operand `imul` forms are preferred when you do not need the f
     idiv rcx                 ; signed division
 ```
 
-A division by zero raises `#DE`; the OS turns it into `SIGFPE` on Linux/macOS.
+A division by zero raises `#DE`; the OS turns it into `SIGFPE` on macOS/Linux.
 
 ## Worked example — addition via the exit status
 
