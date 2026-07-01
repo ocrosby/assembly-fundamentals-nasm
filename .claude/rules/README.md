@@ -16,6 +16,9 @@ them.
 - [asm-style.md](asm-style.md) — NASM source uses 4-space indent,
   labels on their own line, and instructive inline comments that
   explain intent rather than restating the opcode.
+- [platform-priority.md](platform-priority.md) — macOS is the
+  primary target; docs lead with the macOS path, examples verify on
+  macOS first, Linux is a supported secondary target.
 
 ## Adding a rule
 

@@ -64,6 +64,10 @@ Current rules:
   indent (enforced by `.editorconfig`), labels on their own line, and
   instructive inline comments that explain intent rather than
   restating the opcode.
+- [platform-priority](.claude/rules/platform-priority.md) — **macOS
+  is the primary development target.** Docs lead with the macOS
+  path, examples verify on macOS before shipping, Linux is a
+  supported secondary target.
 
 To add a rule, follow the workflow in
 [.claude/rules/README.md](.claude/rules/README.md).
@@ -118,9 +122,17 @@ with a `## See also` link back to the index instead. Sequence is the navigation.
 ### Platform conventions
 
 - Default target is **x86-64, Intel syntax, NASM**.
-- Where Linux and macOS differ (syscall numbers, linking, entry symbol), give
-  both, side-by-side, under explicit `## Linux` / `## macOS` subheadings.
-- Do not silently prefer one platform — this repo is read on both.
+- **macOS is the primary target.** See
+  [.claude/rules/platform-priority.md](.claude/rules/platform-priority.md)
+  for the full policy. In short: new docs lead with the macOS path
+  under `## macOS`, then the Linux form under `## Linux`; new examples
+  must build and run on macOS before shipping; toolchain and debugger
+  defaults favor macOS.
+- Where Linux and macOS differ (syscall numbers, linking, entry symbol),
+  give both under explicit `## macOS` / `## Linux` subheadings — macOS
+  first, Linux second.
+- Linux stays fully supported. Do not break the ELF path, and do not
+  drop the `%ifdef MACOS` / `%else` branches in cross-platform sources.
 
 ### Terminology
 
