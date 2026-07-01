@@ -148,7 +148,7 @@ Use these spellings consistently across all docs:
 
 ### Linking and cross-references
 
-- Use Markdown links, never bare URLs in prose ("see [Procedures](14-procedures.md)").
+- Use Markdown links, never bare URLs in prose (e.g., `[Procedures](14-procedures.md)`).
 - Link forward and backward between adjacent chapters; readers must be able to
   navigate without going back to the index.
 

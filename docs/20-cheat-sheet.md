@@ -85,3 +85,9 @@ See [System Calls](16-system-calls.md).
     sub rsp, 8               ; re-align stack before a libc call
 default rel                  ; RIP-relative addressing for PIE
 ```
+
+## See also
+
+- [NASM Cheat Sheet](22-nasm-cheat-sheet.md) — assembler syntax, directives, and preprocessor.
+- [Debugging](19-debugging.md) — `lldb` and `gdb` reference; walkthroughs in [23](23-lldb-walkthrough.md) / [24](24-gdb-walkthrough.md).
+- [Index](README.md)
