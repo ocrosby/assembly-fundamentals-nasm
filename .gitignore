@@ -2,6 +2,9 @@
 *.o
 *.obj
 
+# Static archives (e.g. libs/libasm.a)
+*.a
+
 # macOS debug bundles
 *.dSYM/
 
