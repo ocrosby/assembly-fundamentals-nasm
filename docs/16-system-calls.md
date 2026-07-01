@@ -25,8 +25,8 @@ macOS sets the **high byte** of `rax` to the syscall class and the low bytes to 
 
 | Name       | Number             | Args              |
 |------------|--------------------|-------------------|
-| `write`    | `0x2000004`        | fd, buf, count    |
 | `exit`     | `0x2000001`        | status            |
+| `write`    | `0x2000004`        | fd, buf, count    |
 
 ```nasm
     mov rax, 0x2000004               ; sys_write
