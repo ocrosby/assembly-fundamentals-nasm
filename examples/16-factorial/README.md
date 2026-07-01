@@ -35,5 +35,6 @@ Expected: `exit=120`.
 
 ## Next
 
-- [17-macros](../17-macros/) — `%macro` hides the syscall
-  boilerplate that shows up in every example so far.
+- [17-stack-args](../17-stack-args/) — pass more arguments than
+  the six register slots the ABI provides, and let the extras
+  travel on the stack.

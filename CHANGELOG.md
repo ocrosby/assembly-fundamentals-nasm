@@ -8,6 +8,16 @@ The repository is unversioned — only the tip of `main` is maintained
 
 ## Unreleased
 
+- Add `examples/17-stack-args/` — pass eight integer args to
+  `sum8(a..h)`. Introduces the six-register cap of the System V
+  AMD64 ABI, the right-to-left push order for args 7+, callee-
+  side addressing via `[rbp + 16]` / `[rbp + 24]`, and caller
+  cleanup with `add rsp, 16`. Renames the previous `17-macros`
+  to `18-macros`. `docs/17-macros.md` Runnable pointer, CI
+  expected-exit table, and the issue-template dropdown are
+  updated to match. `docs/14-procedures.md` gains a third
+  Runnable entry alongside 14-square and 16-factorial.
+
 - Add `examples/16-factorial/` — recursion. `factorial(5) = 120`
   computed by a subroutine that calls itself, preserving `n` in
   `rbx` (callee-saved) across the recursive call. Renames the
