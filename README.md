@@ -130,6 +130,10 @@ scannable, and consistent with the existing guides.
 - [docs/21-references.md](docs/21-references.md) — instruction-set references,
   syscall tables, and further reading.
 
+## Changelog
+
+See [CHANGELOG.md](CHANGELOG.md) for notable changes grouped by month.
+
 ## License
 
 Released under the [MIT License](LICENSE).
