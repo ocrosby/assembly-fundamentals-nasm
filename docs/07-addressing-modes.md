@@ -62,6 +62,13 @@ The processor needs to know how wide the access is. If neither operand pins it d
     inc qword [counter]
 ```
 
+## Runnable
+
+- [examples/19-struct-ptr/](../examples/19-struct-ptr/) — accessing
+  struct fields as `[reg + offset]` from a pointer, and the RMW
+  `add [mem], reg` form that reads, modifies, and writes in one
+  instruction.
+
 ## Next
 
 - [Data Movement](08-data-movement.md)
