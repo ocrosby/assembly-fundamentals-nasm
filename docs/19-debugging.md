@@ -70,6 +70,10 @@ nm ./hello | grep ' T '     # what code symbols exist?
 | Wrong arithmetic result   | Operand size mismatch; review `mov` widths        |
 | Garbage in a register     | Caller-saved register clobbered across a `call`   |
 
+## For a full walkthrough
+
+- [lldb Walkthrough](23-lldb-walkthrough.md) — step through `examples/07-square` end-to-end, watching a `call`, the callee body, and the return value flow back through `rax`.
+
 ## Next
 
 - [Cheat Sheet](20-cheat-sheet.md)
