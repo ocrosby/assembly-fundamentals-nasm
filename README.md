@@ -31,7 +31,7 @@ purpose so a single concept fits on one screen.
 - One concept per page — every guide in [docs/](docs/) fits on a single screen.
 - End-to-end coverage from `hello world` through macros, the stack, and debugging.
 - Copy-pasteable examples assembled and linked from the command line.
-- Side-by-side notes for Linux and macOS where the syscall ABI differs.
+- Side-by-side notes for macOS and Linux where the syscall ABI differs.
 - Cross-references between topics so related ideas are one click apart.
 
 ## Requirements

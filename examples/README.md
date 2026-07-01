@@ -24,8 +24,8 @@ mechanics.
 
 ## How to build
 
-Each example directory contains a `Makefile` that auto-detects Linux
-versus macOS and runs the right `nasm` and `ld` commands.
+Each example directory contains a `Makefile` that auto-detects macOS
+versus Linux and runs the right `nasm` and `ld` commands.
 
 ```bash
 cd examples/01-exit-zero
@@ -40,10 +40,10 @@ Build artifacts (`*.o` and the unsuffixed executables) are gitignored.
 
 ## Platform notes
 
-- **Linux (x86-64).** Native; nothing extra to install beyond NASM and `binutils`.
 - **macOS (Intel).** Native; uses the Xcode Command Line Tools' `ld`.
 - **macOS (Apple Silicon).** x86-64 Mach-O binaries run under Rosetta. Install
   with `softwareupdate --install-rosetta` if it is not already present.
+- **Linux (x86-64).** Native; nothing extra to install beyond NASM and `binutils`.
 
 ## Adding a new example
 

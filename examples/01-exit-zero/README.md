@@ -6,7 +6,7 @@ that does anything observable.
 ## Introduces
 
 - The `.text` section.
-- Entry symbols `_start` (Linux) and `_main` (macOS).
+- Entry symbols `_main` (macOS) and `_start` (Linux).
 - The `syscall` instruction: number in `rax`, args in `rdi`/`rsi`/`rdx`, …
 - Zeroing a register with `xor reg, reg`.
 

@@ -128,7 +128,7 @@ with a `## See also` link back to the index instead. Sequence is the navigation.
   under `## macOS`, then the Linux form under `## Linux`; new examples
   must build and run on macOS before shipping; toolchain and debugger
   defaults favor macOS.
-- Where Linux and macOS differ (syscall numbers, linking, entry symbol),
+- Where macOS and Linux differ (syscall numbers, linking, entry symbol),
   give both under explicit `## macOS` / `## Linux` subheadings — macOS
   first, Linux second.
 - Linux stays fully supported. Do not break the ELF path, and do not
@@ -221,7 +221,7 @@ only — the raw `nasm` and `ld` commands are not restated.
 3. Add a row to the table in `examples/README.md` in sequence order.
 4. Add or update a `## Runnable` section in the relevant `docs/NN-*.md`
    chapter to point at the new example.
-5. Verify it assembles, links, and runs on both Linux and macOS before
+5. Verify it assembles, links, and runs on both macOS and Linux before
    shipping.
 
 ### Build artifacts

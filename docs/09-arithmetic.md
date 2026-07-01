@@ -47,21 +47,42 @@ A division by zero raises `#DE`; the OS turns it into `SIGFPE` on macOS/Linux.
 
 ## Worked example — addition via the exit status
 
-A complete Linux program that returns `7 + 5` as its exit status. Reading the result with `echo $?` is the simplest way to "see" the answer without writing to stdout.
+A complete program that returns `7 + 5` as its exit status. Reading the result with `echo $?` is the simplest way to "see" the answer without writing to stdout.
 
 ```nasm
+%ifdef MACOS
+%define SYS_EXIT 0x2000001
+%else
+%define SYS_EXIT 60
+%endif
+
+default rel
 global _start
+global _main
 
 section .text
+
 _start:
+_main:
     mov rax, 7
     mov rbx, 5
     add rax, rbx             ; rax = 12
 
     mov rdi, rax             ; exit status = 12
-    mov rax, 60              ; sys_exit (Linux)
+    mov rax, SYS_EXIT
     syscall
 ```
+
+Build and run on macOS:
+
+```bash
+nasm -f macho64 -DMACOS add.asm -o add.o
+ld -macos_version_min 11.0 -lSystem -o add add.o \
+   -syslibroot "$(xcrun -sdk macosx --show-sdk-path)"
+./add ; echo $?     # 12
+```
+
+Or on Linux:
 
 ```bash
 nasm -f elf64 add.asm -o add.o
