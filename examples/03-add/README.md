@@ -23,5 +23,5 @@ Expected: `exit=12`.
 
 ## Next
 
-- [04-hello](../04-hello/) — write to standard output instead of just
-  exiting.
+- [04-write-char](../04-write-char/) — write to standard output,
+  starting with the smallest possible payload: one byte.
