@@ -63,7 +63,7 @@ ld hello.o -o hello
 
 ## Runnable
 
-- [examples/04-hello/](../examples/04-hello/) — this same program with a `Makefile` that auto-detects the platform. `make && make run`.
+- [examples/07-write-line/](../examples/07-write-line/) — this same program with a `Makefile` that auto-detects the platform. `make && make run`.
 
 ## Next
 

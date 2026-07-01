@@ -70,7 +70,7 @@ Resist using macros to invent a tiny private language; they hide what the CPU ac
 
 ## Runnable
 
-- [examples/09-macros/](../examples/09-macros/) — `%macro` hides the `sys_write` and `sys_exit` boilerplate so `_main` reads as three high-level lines.
+- [examples/16-macros/](../examples/16-macros/) — `%macro` hides the `sys_write` and `sys_exit` boilerplate so `_main` reads as three high-level lines.
 
 ## Next
 

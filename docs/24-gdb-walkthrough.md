@@ -1,7 +1,7 @@
 # gdb Walkthrough
 
 A step-by-step tour of debugging a small NASM program under `gdb` on
-Linux. The target is [`examples/07-square`](../examples/07-square/) —
+Linux. The target is [`examples/14-square`](../examples/14-square/) —
 the same program the [lldb Walkthrough](23-lldb-walkthrough.md) uses
 on macOS, so the two chapters can be read side by side to compare
 the debuggers.
@@ -14,7 +14,7 @@ For the reference-level `gdb` command list, see
 Build the target with DWARF debug info:
 
 ```bash
-cd examples/07-square
+cd examples/14-square
 make clean
 nasm -f elf64 -g -F dwarf square.asm -o square.o
 ld square.o -o square
@@ -22,7 +22,7 @@ gdb ./square
 ```
 
 Linux `ld` defaults to `_start` as the entry symbol, which is one of
-the two globals `examples/07-square` declares — no `-e` flag needed.
+the two globals `examples/14-square` declares — no `-e` flag needed.
 
 ## Switch to Intel syntax
 

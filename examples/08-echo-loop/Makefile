@@ -1,4 +1,4 @@
-NAME    := hello
+NAME    := echo-loop
 SRC     := $(NAME).asm
 OBJ     := $(NAME).o
 BIN     := $(NAME)

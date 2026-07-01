@@ -2,7 +2,7 @@
 
 Sum a 5-element `int64` array (10 + 20 + 30 + 40 + 50 = 150) and
 return the sum as the exit status. Builds on
-[05-countdown](../05-countdown/) by adding memory.
+[12-countdown](../12-countdown/) by adding memory.
 
 ## Introduces
 
@@ -28,4 +28,4 @@ Expected: `exit=150`.
 
 ## Next
 
-- [07-square](../07-square/) — factor a calculation into a procedure.
+- [07-square](../14-square/) — factor a calculation into a procedure.

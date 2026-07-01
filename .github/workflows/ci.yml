@@ -58,16 +58,34 @@ jobs:
         shell: bash
         run: |
           set -e
+          # Seed input files that the file-I/O examples read from.
+          printf "read by NASM\n" > /tmp/nasm-read-file.txt
+          printf "copy source content\n" > /tmp/nasm-copy-src.txt
+
           declare -A expected=(
             [01-exit-zero]=0
             [02-exit-status]=42
             [03-add]=12
-            [04-hello]=0
-            [05-countdown]=0
-            [06-sum-array]=150
-            [07-square]=49
-            [08-stack-frame]=25
-            [09-macros]=42
+            [04-write-char]=0
+            [05-read-char]=0
+            [06-read-line]=0
+            [07-write-line]=0
+            [08-echo-loop]=0
+            [09-read-file]=0
+            [10-write-file]=0
+            [11-copy-file]=0
+            [12-countdown]=0
+            [13-sum-array]=150
+            [14-square]=49
+            [15-stack-frame]=25
+            [16-macros]=42
+          )
+          # Examples that read from stdin get an empty pipe so they hit
+          # EOF immediately and exit 0 without waiting for a TTY.
+          declare -A pipe_stdin=(
+            [05-read-char]=1
+            [06-read-line]=1
+            [08-echo-loop]=1
           )
           fail=0
           for dir in "${!expected[@]}"; do
@@ -79,7 +97,11 @@ jobs:
             bin=$(echo "$dir" | sed 's/^[0-9][0-9]-//')
             ( cd "$path" && make clean >/dev/null && make all >/dev/null )
             got=0
-            "./$path/$bin" >/dev/null || got=$?
+            if [ -n "${pipe_stdin[$dir]-}" ]; then
+              : | "./$path/$bin" >/dev/null || got=$?
+            else
+              "./$path/$bin" >/dev/null || got=$?
+            fi
             want=${expected[$dir]}
             if [ "$got" -eq "$want" ]; then
               printf "OK  : %-20s exit=%d\n" "$dir" "$got"

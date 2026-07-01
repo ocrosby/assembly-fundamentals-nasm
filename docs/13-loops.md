@@ -74,8 +74,8 @@ sum_arr:
 
 ## Runnable
 
-- [examples/05-countdown/](../examples/05-countdown/) — the `dec`/`jnz` idiom.
-- [examples/06-sum-array/](../examples/06-sum-array/) — the array-sum loop above as
+- [examples/12-countdown/](../examples/12-countdown/) — the `dec`/`jnz` idiom.
+- [examples/13-sum-array/](../examples/13-sum-array/) — the array-sum loop above as
   a complete program. `make && make run`.
 
 ## Next

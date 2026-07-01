@@ -1,7 +1,7 @@
 # 07 — square
 
 Call a procedure that squares its argument: `square(7) = 49`,
-returned as the exit status. Builds on [06-sum-array](../06-sum-array/)
+returned as the exit status. Builds on [13-sum-array](../13-sum-array/)
 by extracting a reusable subroutine.
 
 ## Introduces
@@ -27,5 +27,5 @@ Expected: `exit=49`.
 
 ## Next
 
-- [08-stack-frame](../08-stack-frame/) — promote the leaf function
+- [08-stack-frame](../15-stack-frame/) — promote the leaf function
   into one with a full stack frame and stack locals.

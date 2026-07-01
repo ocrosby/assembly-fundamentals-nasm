@@ -1,7 +1,7 @@
 # 05 — countdown
 
 Decrement `rcx` from `5` to `0`, then exit. No I/O — the loop *is*
-the point. Builds on [04-hello](../04-hello/) by adding control flow
+the point. Builds on [11-copy-file](../11-copy-file/) by adding control flow
 without taking on any new I/O surface.
 
 ## Introduces
@@ -25,4 +25,4 @@ Expected: `exit=0`.
 
 ## Next
 
-- [06-sum-array](../06-sum-array/) — combine the loop with memory.
+- [06-sum-array](../13-sum-array/) — combine the loop with memory.
