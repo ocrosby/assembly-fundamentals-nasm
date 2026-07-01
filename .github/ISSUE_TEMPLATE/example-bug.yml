@@ -1,0 +1,65 @@
+name: Example bug
+description: An example under examples/NN-slug/ fails to build, fails to run, or returns the wrong exit status.
+title: "examples/NN-slug: <what's wrong>"
+labels: ["examples"]
+body:
+  - type: dropdown
+    id: example
+    attributes:
+      label: Which example
+      options:
+        - examples/01-exit-zero
+        - examples/02-exit-status
+        - examples/03-add
+        - examples/04-hello
+        - examples/05-countdown
+        - examples/06-sum-array
+        - examples/07-square
+        - examples/08-stack-frame
+        - examples/09-macros
+    validations:
+      required: true
+
+  - type: dropdown
+    id: platform
+    attributes:
+      label: Platform
+      options:
+        - macOS (Intel)
+        - macOS (Apple Silicon under Rosetta)
+        - Linux (x86-64)
+        - Windows (WSL2)
+    validations:
+      required: true
+
+  - type: input
+    id: nasm
+    attributes:
+      label: NASM version
+      description: Output of `nasm -v`.
+      placeholder: NASM version 2.16.03 ...
+    validations:
+      required: true
+
+  - type: textarea
+    id: repro
+    attributes:
+      label: Steps to reproduce
+      description: The exact commands run and their output. Prefer `make`, `make run`, `make clean` from the example directory.
+      value: |
+        ```bash
+        cd examples/NN-slug
+        make clean
+        make
+        make run
+        ```
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: What you expected
+      description: The exit code or output the example is supposed to produce, per its README.
+    validations:
+      required: true

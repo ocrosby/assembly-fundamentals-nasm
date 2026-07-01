@@ -1,0 +1,42 @@
+name: Doc bug
+description: A wrong instruction, broken link, typo, or platform-specific error in a docs/ chapter or README.
+title: "docs: <what's wrong>"
+labels: ["docs"]
+body:
+  - type: input
+    id: location
+    attributes:
+      label: File and line range
+      description: e.g. `docs/16-system-calls.md:34-46` or `README.md:78`.
+      placeholder: docs/NN-...:LINE
+    validations:
+      required: true
+
+  - type: textarea
+    id: read
+    attributes:
+      label: What you read
+      description: Quote the actual text or paste a screenshot.
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: What you expected
+      description: What should it say instead — and, if possible, a source (NASM manual, Intel SDM, Linux man page, System V AMD64 ABI).
+    validations:
+      required: true
+
+  - type: dropdown
+    id: platform
+    attributes:
+      label: Platform (if applicable)
+      options:
+        - Not platform-specific
+        - macOS (Intel)
+        - macOS (Apple Silicon under Rosetta)
+        - Linux (x86-64)
+        - Windows (WSL2)
+    validations:
+      required: false
