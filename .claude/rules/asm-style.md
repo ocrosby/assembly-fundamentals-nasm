@@ -11,6 +11,12 @@ NASM `.asm` files in this repo follow a uniform style optimized for
 is educational; every example will be read by someone who has never
 seen the instructions before.
 
+For semantic invariants that go beyond formatting (case-sensitivity,
+brackets for memory, size hints, `default rel`), see
+[nasm-correctness.md](nasm-correctness.md). This file governs how
+the source *looks*; that file governs whether it *does what the
+reader expects*.
+
 ## Indentation
 
 - **4 spaces** of indent for instructions and pseudo-ops inside a
