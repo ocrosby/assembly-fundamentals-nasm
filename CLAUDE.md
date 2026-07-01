@@ -35,6 +35,11 @@ year from now.
 - `docs/` — numbered, single-screen topic guides.
   - `docs/README.md` is the index.
   - Filename pattern: `NN-slug.md` where `NN` controls reading order.
+  - `docs/syscalls/` — reference appendix, not part of the numbered
+    reading sequence: a top hub plus one subdirectory per OS
+    (`macos/`, `linux/`), each with a `README.md` hub and short,
+    single-screen category pages (`process.md`, `file-io.md`, …).
+    These pages end with `## See also`, like the other appendices.
 - `examples/` — runnable `.asm` programs organized as a constructive sequence
   (`01-…`, `02-…`, …). See **Runnable Examples** below for the full rules.
 - `LICENSE` — MIT.

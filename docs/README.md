@@ -49,6 +49,7 @@ A progressive walkthrough of x86-64 assembly with NASM. Each guide is intentiona
 - [NASM Cheat Sheet](22-nasm-cheat-sheet.md) — assembler-specific syntax: directives, preprocessor, storage sizes, literals.
 - [lldb Walkthrough](23-lldb-walkthrough.md) — step-by-step debugging of `examples/14-square` on macOS.
 - [gdb Walkthrough](24-gdb-walkthrough.md) — same walkthrough, on Linux.
+- [Syscall Reference](syscalls/README.md) — the common macOS and Linux syscalls, organized by category, with the `rax` value each one needs.
 - [Runnable examples](../examples/) — a constructive sequence of nine small programs paired with chapters 2, 9, 13, 14, 15, and 17.
 
 ## Conventions Used in These Guides

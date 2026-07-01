@@ -14,7 +14,10 @@ External sources to go deeper than these guides.
 
 ## Operating system interface
 
-- [Linux x86-64 syscall table](https://blog.rchapman.org/posts/Linux_System_Call_Table_for_x86_64/) — number, name, and argument layout for every Linux syscall.
+- [Syscall Reference](syscalls/README.md) — the common macOS and Linux calls, organized by category, with the `rax` value each one needs.
+- [XNU `syscalls.master`](https://github.com/apple/darwin-xnu/blob/main/bsd/kern/syscalls.master) — Apple's source-of-truth table that assigns every macOS BSD syscall number.
+- [Linux `syscall_64.tbl`](https://github.com/torvalds/linux/blob/master/arch/x86/entry/syscalls/syscall_64.tbl) — the kernel's source-of-truth table that assigns every x86-64 syscall number.
+- [Linux x86-64 syscall table (rchapman)](https://blog.rchapman.org/posts/Linux_System_Call_Table_for_x86_64/) — number, name, and full argument layout for every Linux syscall.
 
 ## See also
 
