@@ -19,6 +19,10 @@ them.
 - [platform-priority.md](platform-priority.md) — macOS is the
   primary target; docs lead with the macOS path, examples verify on
   macOS first, Linux is a supported secondary target.
+- [nasm-correctness.md](nasm-correctness.md) — the four semantic
+  invariants the NASM Manual mandates for x86-64 sources:
+  case-sensitivity, square brackets for memory, size hints, and
+  `default rel`.
 
 ## Adding a rule
 

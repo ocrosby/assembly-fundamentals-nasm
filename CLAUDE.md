@@ -68,6 +68,12 @@ Current rules:
   is the primary development target.** Docs lead with the macOS
   path, examples verify on macOS before shipping, Linux is a
   supported secondary target.
+- [nasm-correctness](.claude/rules/nasm-correctness.md) — the four
+  semantic invariants the [NASM Manual](https://www.nasm.us/doc/)
+  mandates for x86-64 sources: case-sensitivity, square brackets
+  for every memory reference, size hints when NASM cannot infer,
+  and `default rel` in every file. Violations produce wrong code
+  or relocation errors, not just ugly diffs.
 
 To add a rule, follow the workflow in
 [.claude/rules/README.md](.claude/rules/README.md).
