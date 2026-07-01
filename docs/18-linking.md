@@ -5,8 +5,8 @@ NASM produces an **object file**; the linker combines one or more object files i
 ## Output formats
 
 ```bash
-nasm -f elf64    file.asm -o file.o     # Linux
 nasm -f macho64  file.asm -o file.o     # macOS
+nasm -f elf64    file.asm -o file.o     # Linux
 nasm -f win64    file.asm -o file.obj   # Windows
 ```
 
@@ -16,26 +16,10 @@ The format flag must match the host OS — an ELF object will not link on macOS.
 
 | Platform | Default entry symbol |
 |----------|----------------------|
-| Linux    | `_start`             |
 | macOS    | `_main`              |
+| Linux    | `_start`             |
 
 The entry symbol must be marked `global`. If you call `libc`, use `_main` everywhere and let the C runtime call you after it sets up its state.
-
-## Linking — Linux
-
-Freestanding (no libc):
-
-```bash
-ld file.o -o file
-```
-
-With libc:
-
-```bash
-gcc file.o -o file -no-pie
-```
-
-`gcc` handles startup files and `libc` for you. Use `-no-pie` if your example assumes absolute addressing; modern examples should use `default rel` and `lea ... [rel ...]` instead.
 
 ## Linking — macOS
 
@@ -54,13 +38,29 @@ Or, more concisely with `clang`:
 clang file.o -o file
 ```
 
+## Linking — Linux
+
+Freestanding (no libc):
+
+```bash
+ld file.o -o file
+```
+
+With libc:
+
+```bash
+gcc file.o -o file -no-pie
+```
+
+`gcc` handles startup files and `libc` for you. Use `-no-pie` if your example assumes absolute addressing; modern examples should use `default rel` and `lea ... [rel ...]` instead.
+
 ## Inspecting the result
 
 ```bash
 file ./prog                     # what kind of binary?
 nm ./prog                       # symbol table
-objdump -d ./prog               # disassemble (Linux)
 otool -tV ./prog                # disassemble (macOS)
+objdump -d ./prog               # disassemble (Linux)
 ```
 
 ## Common errors

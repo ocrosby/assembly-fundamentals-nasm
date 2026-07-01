@@ -63,7 +63,7 @@ Split shared definitions into their own file and include them:
 ## When to reach for a macro
 
 - Repeated boilerplate (e.g., a `write` syscall used in five examples).
-- Platform branching (Linux vs macOS).
+- Platform branching (macOS vs Linux).
 - Naming magic numbers so a reader doesn't have to look them up.
 
 Resist using macros to invent a tiny private language; they hide what the CPU actually does, which is the whole point of writing assembly.
