@@ -10,8 +10,11 @@ updates:
       day: "monday"
     open-pull-requests-limit: 5
     commit-message:
+      # `prefix` alone gives us `chore(deps): bump ...`. Do NOT add
+      # `include: "scope"` — Dependabot then appends its own scope
+      # to the prefix, producing the double-parens `chore(deps)(deps): bump ...`
+      # that #28 and #29 shipped with before this was fixed.
       prefix: "chore(deps)"
-      include: "scope"
     labels:
       - "dependencies"
       - "github-actions"
