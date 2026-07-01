@@ -38,6 +38,8 @@ macOS sets the **high byte** of `rax` to the syscall class and the low bytes to 
 
 Apple discourages direct syscalls and may break them between macOS releases. For anything beyond a toy, link `libSystem` and call `write`, `exit`, etc., as ordinary functions. See [Linking](18-linking.md).
 
+For a category-organized list of the common BSD calls and the `rax` value each one needs, see the [macOS Syscall Reference](syscalls/macos/README.md).
+
 ## Linux
 
 Numbers come from `/usr/include/asm/unistd_64.h`:
