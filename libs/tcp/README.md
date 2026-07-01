@@ -82,6 +82,27 @@ $(BIN): $(OBJ) $(LIBTCP)
 Building the consumer does not automatically build the archive; run
 `make -C ../../libs/tcp` first.
 
+## Test
+
+```bash
+make test                           # requires python3
+```
+
+`make test` builds `libtcp.a` and `libasm.a`, then runs the harness in
+[`test/`](test/): it starts a loopback server on `127.0.0.1` (an
+ephemeral kernel-assigned port), assembles and links the small client
+[`test/tcp-smoke.asm`](test/tcp-smoke.asm) against both archives, and
+checks that a `tcp_connect` / `tcp_send` / `tcp_recv` / `tcp_close`
+round trip returns the server's banner. On success it prints:
+
+```text
+PASS: tcp smoke — received: TCP-OK
+```
+
+The server is loopback-only, single-connection, and timeout-bounded,
+so the test never reaches the network and cannot hang. It runs on both
+macOS and Linux under CI.
+
 ## See also
 
 - [`../asm/`](../asm/) — formatting and process helpers
