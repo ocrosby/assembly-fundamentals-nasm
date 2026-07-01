@@ -57,6 +57,10 @@ Calling it:
 - [examples/16-factorial/](../examples/16-factorial/) — recursion:
   a subroutine that calls itself, preserving its argument in `rbx`
   across the recursive call.
+- [examples/17-stack-args/](../examples/17-stack-args/) — a
+  subroutine called with **eight** integer args: the first six go
+  in registers, the last two travel on the stack per the System V
+  AMD64 ABI.
 
 ## Next
 

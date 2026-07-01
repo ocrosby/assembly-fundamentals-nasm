@@ -24,7 +24,8 @@ body:
         - examples/14-square
         - examples/15-stack-frame
         - examples/16-factorial
-        - examples/17-macros
+        - examples/17-stack-args
+        - examples/18-macros
     validations:
       required: true
 
