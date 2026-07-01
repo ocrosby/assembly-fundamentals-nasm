@@ -7,7 +7,8 @@ UNAME_S := $(shell uname -s)
 ifeq ($(UNAME_S),Darwin)
 NASM_FLAGS := -f macho64 -DMACOS
 SDK        := $(shell xcrun -sdk macosx --show-sdk-path)
-LD         := ld -macos_version_min 11.0 -lSystem -syslibroot $(SDK)
+# `-w` silences a benign ld warning about nasm not emitting the LC_BUILD_VERSION load command.
+LD         := ld -w -macos_version_min 11.0 -lSystem -syslibroot $(SDK)
 else
 NASM_FLAGS := -f elf64
 LD         := ld
