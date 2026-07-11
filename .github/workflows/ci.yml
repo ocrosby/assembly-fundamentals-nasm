@@ -134,3 +134,7 @@ jobs:
       - name: Build and smoke-test the time library
         shell: bash
         run: make -C libs/time test
+
+      - name: Build and smoke-test the process library
+        shell: bash
+        run: make -C libs/proc test
