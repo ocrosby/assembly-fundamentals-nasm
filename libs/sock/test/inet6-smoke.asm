@@ -11,11 +11,25 @@
 ;          v4 octet > 255, short v4 tail, bare v4 no ::,
 ;          '1:2:3:4:5:6:7:8::' zero-expansion, trailing ':' ,
 ;          leading ':')
+;   o..t — inet_pton6 branches the earlier failure list did not
+;          reach: non-':' after a group, hex letter before dotted
+;          quad, dotted quad with no slot room (the off-by-one
+;          that used to stomp on the caller's r15), dq missing
+;          digit, dq leading zero, dq trailing garbage
 ;   1..9 — inet_ntop6 canonical output (all-zero → "::", ::1,
 ;          1::, 2001:db8::1, full 8-group, IPv4-mapped, RFC 5952
 ;          first-tie run, single-zero not compressed, all-ffff)
+;   0    — 2-digit hex-group emission (value 0x0042 → "42"); the
+;          .emit_group nibble-suppression path the earlier cases
+;          didn't exercise
+;   V    — 2-digit octet in an IPv4-mapped tail (::ffff:1.42.3.4);
+;          the .emit_byte two-digit branch in the v4-tail path
 ;   z    — buffer-too-small returns NULL
 ;   R    — pton→ntop→pton round-trip
+;
+; Together these hit every conditional branch in inet-pton6.asm
+; and inet-ntop6.asm — the four pure-computation files in inet/
+; are now fully branch-covered.
 ;
 ; No syscalls into libsock other than the routines under test —
 ; write() and exit() go straight to the kernel.
@@ -83,6 +97,14 @@ f_trail:    db "1:2:3:4:5:6:7:8:", 0
 f_lead:     db ":1:2:3:4:5:6:7:8", 0
 f_dqhex:    db "abcd::1.2.3.4", 0     ; hex in a group before dotted quad → OK actually
 
+; ---- pton6 rejects: extra branches the initial list missed ----
+f_junk:     db "1x", 0                ; non-':' char after a valid hex group
+f_dqhexpre: db "abc.1.2.3.4", 0       ; dq with hex letter in the pre-dot chars
+f_dqnoroom: db "1:2:3:4:5:6:7:1.2.3.4", 0 ; 7 groups + dq → dq no slot room
+f_dqempty:  db "::1..2.3.4", 0        ; dq octet with no digit (dot after dot)
+f_dqlz:     db "::01.2.3.4", 0        ; dq leading zero
+f_dqtrail:  db "::1.2.3.4x", 0        ; dq trailing garbage after last octet
+
 ; ---- ntop6 canonical output expectations ----
 ; Each: {16-byte src (network order), expected NUL-terminated text}
 n_all0_src: db 0,0, 0,0, 0,0, 0,0, 0,0, 0,0, 0,0, 0,0
@@ -114,6 +136,20 @@ n_one_exp:  db "1:2:0:4:5:6:7:8", 0
 ; Max-value groups.
 n_max_src:  db 0xff,0xff, 0xff,0xff, 0xff,0xff, 0xff,0xff, 0xff,0xff, 0xff,0xff, 0xff,0xff, 0xff,0xff
 n_max_exp:  db "ffff:ffff:ffff:ffff:ffff:ffff:ffff:ffff", 0
+
+; 2-digit hex group (0x0042 at position 1, five zeros at positions
+; 2..7). The best-run scanner picks the 6-zero run starting at
+; position 2, so the output is "0:42::". Exercises the "1 leading
+; zero to skip, 2 nibbles to emit" path in .emit_group that
+; single- and four-digit groups do not reach.
+n_2dig_src: db 0,0, 0,0x42, 0,0, 0,0, 0,0, 0,0, 0,0, 0,0
+n_2dig_exp: db "0:42::", 0
+
+; IPv4-mapped tail with a two-digit octet (42) so we exercise the
+; .emit_byte two-digit path in the v4-tail branch. The three-digit
+; and one-digit paths are covered by n_v4_src (192, 0, 2, 1).
+n_v4_2d_src: db 0,0, 0,0, 0,0, 0,0, 0,0, 0xff,0xff, 1,42, 3,4
+n_v4_2d_exp: db "::ffff:1.42.3.4", 0
 
 pass_msg:   db "PASS", 10
 pass_len:   equ $ - pass_msg
@@ -242,6 +278,31 @@ _main:
     lea rdi, [f_lead]
     call pton_fail
 
+    ; ---- pton6 rejects: extra branches ----
+    mov r15b, 'o'                     ; line 130 in inet-pton6.asm
+    lea rdi, [f_junk]
+    call pton_fail
+
+    mov r15b, 'p'                     ; line 155
+    lea rdi, [f_dqhexpre]
+    call pton_fail
+
+    mov r15b, 'q'                     ; line 157 (the fixed off-by-one)
+    lea rdi, [f_dqnoroom]
+    call pton_fail
+
+    mov r15b, 'r'                     ; line 171
+    lea rdi, [f_dqempty]
+    call pton_fail
+
+    mov r15b, 's'                     ; line 182
+    lea rdi, [f_dqlz]
+    call pton_fail
+
+    mov r15b, 't'                     ; line 218
+    lea rdi, [f_dqtrail]
+    call pton_fail
+
     ; ---- ntop6 canonical output ----
     mov r15b, '1'
     lea rdi, [n_all0_src]
@@ -286,6 +347,16 @@ _main:
     mov r15b, '9'
     lea rdi, [n_max_src]
     lea rsi, [n_max_exp]
+    call ntop_ok
+
+    mov r15b, '0'
+    lea rdi, [n_2dig_src]
+    lea rsi, [n_2dig_exp]
+    call ntop_ok
+
+    mov r15b, 'V'
+    lea rdi, [n_v4_2d_src]
+    lea rsi, [n_v4_2d_exp]
     call ntop_ok
 
     ; ntop6 buffer-too-small returns NULL

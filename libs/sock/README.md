@@ -162,9 +162,16 @@ make test                           # requires python3
 `make test` builds `libsock.a` and `libasm.a`, then runs six
 smoke tests in sequence via the harness in [`test/`](test/).
 Together they call every one of the 30 exported symbols on at
-least one success path, and every syscall wrapper on at least
-one failure path (which is what actually exercises the macOS
-`SYSCALL_NORM` `neg rax` branch — the success paths never do).
+least one success path; every syscall wrapper on at least one
+failure path (which is what actually exercises the macOS
+`SYSCALL_NORM` `neg rax` branch — the success paths never do);
+and every conditional branch inside the four pure-computation
+files in [`inet/`](inet/) (`inet_pton4`, `inet_ntop4`,
+`inet_pton6`, `inet_ntop6`) at least once. The branch-coverage
+audit that produced this suite also caught a real off-by-one
+in `inet_pton6`'s dotted-quad path that used to corrupt the
+caller's `r15` on inputs like `1:2:3:4:5:6:7:1.2.3.4`; the
+regression case is sub-check `q` in `inet6-smoke`.
 
 - [`inet4-smoke.asm`](test/inet4-smoke.asm) — the byte-order
   helpers (`htons`, `htonl`, `ntohs`, `ntohl`) and the strict

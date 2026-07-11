@@ -10,6 +10,12 @@
 ;          octet, leading zero, trailing garbage, missing octet)
 ;   A..C — inet_ntop4 round-trip, buffer-too-small NULL return,
 ;          all-zero address
+;   D..E — inet_pton4 remaining branches: leading non-digit char
+;          (first-char-not-digit path in .next_octet), all-zero
+;          address success (single-digit "0" path via .store)
+;
+; Together these hit every conditional in inet-pton4.asm and
+; every branch of inet-ntop4.asm's EMIT_BYTE macro.
 ;
 ; No syscalls into libsock other than the routines under test —
 ; the write() and exit() calls are made directly against the
@@ -36,6 +42,8 @@ addr_bad:   db "1.2.3.256", 0
 addr_lz:    db "01.2.3.4", 0
 addr_extra: db "1.2.3.4.5", 0
 addr_short: db "1.2.3", 0
+addr_alpha: db "a.1.2.3", 0          ; leading non-digit — must fail
+addr_zero:  db "0.0.0.0", 0          ; every octet is single '0' — must succeed
 pass_msg:   db "PASS", 10
 pass_len:   equ $ - pass_msg
 fail_msg:   db "FAIL:", 32
@@ -160,6 +168,30 @@ _main:
     jne .fail
     mov al, [outstr + 7]
     test al, al
+    jnz .fail
+
+    ; T13: inet_pton4("a.1.2.3") == 0 — first character is not a
+    ; decimal digit. Hits the very first `ja .fail` in .next_octet
+    ; that had never been exercised before this sub-check.
+    lea rdi, [addr_alpha]
+    lea rsi, [buf]
+    call inet_pton4
+    mov r15b, 'D'
+    test rax, rax
+    jnz .fail
+
+    ; T14: inet_pton4("0.0.0.0") — every octet is a single '0'.
+    ; Exercises the "leading '0' as the whole octet" fall-through
+    ; to .store (line 55 in inet-pton4.asm) that the strictness
+    ; tests never reach.
+    lea rdi, [addr_zero]
+    lea rsi, [buf]
+    call inet_pton4
+    mov r15b, 'E'
+    cmp rax, 1
+    jne .fail
+    mov eax, dword [buf]
+    test eax, eax
     jnz .fail
 
     ; PASS

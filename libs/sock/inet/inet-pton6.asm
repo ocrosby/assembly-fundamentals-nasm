@@ -153,7 +153,15 @@ inet_pton6:
     ;     verify the parse itself here.
     test edx, edx
     jnz .fail
-    cmp ebx, 7
+    ; The dotted quad writes 4 bytes starting at scratch[ebx*2],
+    ; so it needs ebx*2 + 4 <= 16 — i.e. ebx <= 6. An off-by-one
+    ; earlier here (cmp ebx, 7) accepted ebx=7 and stomped on
+    ; the saved r15 sitting immediately after the scratch area;
+    ; the .assemble_full path still returned 0 because 7+2 != 8,
+    ; but the caller's r15 was silently corrupted. Sub-check 'q'
+    ; in test/inet6-smoke.asm ("1:2:3:4:5:6:7:1.2.3.4") is the
+    ; regression case.
+    cmp ebx, 6
     jg .fail                        ; needs 2 more group slots
 
     ; Rewind r12 past the digits we consumed as hex — the dotted
