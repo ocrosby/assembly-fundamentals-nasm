@@ -44,3 +44,6 @@ examples/[0-9]*-*/*
 
 # Personal task tracking (global convention from ~/.claude/CLAUDE.md)
 TODO.md
+
+# Claude Code runtime state (not project source)
+.claude/scheduled_tasks.lock
