@@ -40,6 +40,12 @@
 ;   4 v6 miss path: resolv_hostname_at6(hosts, conf, "no-such.
 ;     test", &ip16) → negative errno (same rationale as 2, but
 ;     via the AAAA path)
+;   5 v1.4 failover: FAILOVER_CONF_PATH lists two nameservers.
+;     The first is 127.0.0.1:1 — nothing listens there, so
+;     resolv_a fails against it. The second points at the mock
+;     spun up by run.sh, which answers the canonical name.
+;     The lookup passes only if the iteration falls through
+;     from resolver 1 to resolver 2.
 ;
 ; Fail IDs past 9 use letters — see hosts-smoke for the
 ; convention. The v6 sub-checks stay in the digit range so
@@ -50,6 +56,9 @@
 %endif
 %ifndef CONF_PATH
 %define CONF_PATH "/tmp/libresolv-hostname-conf-default"
+%endif
+%ifndef FAILOVER_CONF_PATH
+%define FAILOVER_CONF_PATH "/tmp/libresolv-hostname-failover-default"
 %endif
 
 %ifdef MACOS
@@ -68,14 +77,19 @@ global _start
 global _main
 
 section .rodata
-hosts_path: db HOSTS_PATH, 0
-conf_path:  db CONF_PATH, 0
+hosts_path:    db HOSTS_PATH, 0
+conf_path:     db CONF_PATH, 0
+failover_conf_path: db FAILOVER_CONF_PATH, 0
 
 n_hit:      db "libresolv-hostname-hit.test", 0
 n_miss:     db "no-such.test", 0
 n_v6_hit:   db "libresolv-hostname-v6.test", 0
+; The mock server answers this canonical name with an A record
+; for 203.0.113.42. Used to verify sub-check 5's failover.
+n_failover: db "libresolv-ok.test", 0
 
 exp_hit:    db 198, 18, 0, 1
+exp_failover: db 203, 0, 113, 42
 
 ; 2001:db8::1 as 16 network-order bytes.
 exp_v6_hit: db 0x20, 0x01, 0x0d, 0xb8, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1
@@ -147,6 +161,24 @@ _main:
     call resolv_hostname_at6
     test rax, rax
     jns .fail
+
+    ; 5: v1.4 failover — the failover fixture lists a dead
+    ; resolver first (127.0.0.1:1) and the mock second. The
+    ; name is not in hosts, so the DNS path runs. The first
+    ; resolver fails with -ECONNREFUSED/-ETIMEDOUT; the second
+    ; answers with 203.0.113.42. Success proves the iterator
+    ; actually moved past the failing entry.
+    mov byte [fail_id], '5'
+    lea rdi, [hosts_path]
+    lea rsi, [failover_conf_path]
+    lea rdx, [n_failover]
+    lea rcx, [ip_buf]
+    call resolv_hostname_at
+    test rax, rax
+    jnz .fail
+    mov eax, [rel exp_failover]
+    cmp eax, dword [ip_buf]
+    jne .fail
 
     ; PASS
     mov rax, SYS_write

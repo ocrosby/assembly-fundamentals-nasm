@@ -83,6 +83,18 @@ domain test
 options ndots:2
 EMPTYEOF
 
+# Ports fixture (v1.4). Two valid entries interleaved with
+# three malformed :port lines — the parser must silently skip
+# the malformed ones and keep the surrounding good entries.
+conf_ports_fixture="$tmp/resolv.ports.conf"
+cat > "$conf_ports_fixture" <<'PORTSEOF'
+nameserver 127.0.0.1:5353
+nameserver 10.0.0.1:0
+nameserver 10.0.0.2:70000
+nameserver 10.0.0.3:abc
+nameserver 198.51.100.1:9999
+PORTSEOF
+
 hostname_hosts_fixture="$tmp/hostname-hosts"
 cat > "$hostname_hosts_fixture" <<'HNHEOF'
 198.18.0.1 libresolv-hostname-hit.test
@@ -202,6 +214,7 @@ fi
 nasm $nasm_fmt \
     -DCONF_PATH="\"$conf_fixture\"" \
     -DCONF_EMPTY_PATH="\"$conf_empty_fixture\"" \
+    -DCONF_PORTS_PATH="\"$conf_ports_fixture\"" \
     resolvconf-smoke.asm -o resolvconf-smoke.o
 "${ld_cmd[@]}" resolvconf-smoke.o "${libs[@]}" -o resolvconf-smoke
 
@@ -219,24 +232,58 @@ fi
 
 # ---------------------------------------------------------------
 # hostname-smoke — composed hosts-then-DNS entry point.
+#
+# v1.4 sub-check 5 exercises multi-resolver failover: the
+# fixture below lists a dead resolver first (127.0.0.1:1
+# accepts no packets) and a live mock second. hostname-smoke
+# only passes if the iteration actually falls through to the
+# second resolver.
 # ---------------------------------------------------------------
-# shellcheck disable=SC2086
-nasm $nasm_fmt \
-    -DHOSTS_PATH="\"$hostname_hosts_fixture\"" \
-    -DCONF_PATH="\"$hostname_conf_fixture\"" \
-    hostname-smoke.asm -o hostname-smoke.o
-"${ld_cmd[@]}" hostname-smoke.o "${libs[@]}" -o hostname-smoke
+portfile3="$tmp/port3"
+python3 mock-dns.py "$portfile3" &
+srv=$!
 
-set +e
-hn_out="$(./hostname-smoke 2>&1)"
-hn_code=$?
-set -e
+port3=""
+for _ in $(seq 1 100); do
+    if [ -f "$portfile3" ]; then
+        port3="$(cat "$portfile3")"
+        break
+    fi
+    sleep 0.05
+done
 
-if [ "$hn_code" -eq 0 ]; then
-    printf "PASS: %-14s output=[%s]\n" "hostname-smoke" "$hn_out"
-else
-    printf "FAIL: %-14s exit=%d output=[%s]\n" "hostname-smoke" "$hn_code" "$hn_out"
+if [ -z "$port3" ]; then
+    printf "FAIL: %-14s (mock did not publish a port within ~5s)\n" "hostname-smoke"
     fail_total=$((fail_total + 1))
+else
+    hostname_failover_conf="$tmp/hostname-failover-conf"
+    cat > "$hostname_failover_conf" <<HFEOF
+nameserver 127.0.0.1:1
+nameserver 127.0.0.1:$port3
+HFEOF
+
+    # shellcheck disable=SC2086
+    nasm $nasm_fmt \
+        -DHOSTS_PATH="\"$hostname_hosts_fixture\"" \
+        -DCONF_PATH="\"$hostname_conf_fixture\"" \
+        -DFAILOVER_CONF_PATH="\"$hostname_failover_conf\"" \
+        hostname-smoke.asm -o hostname-smoke.o
+    "${ld_cmd[@]}" hostname-smoke.o "${libs[@]}" -o hostname-smoke
+
+    set +e
+    hn_out="$(./hostname-smoke 2>&1)"
+    hn_code=$?
+    set -e
+
+    wait "$srv" 2>/dev/null || true
+    srv=""
+
+    if [ "$hn_code" -eq 0 ]; then
+        printf "PASS: %-14s output=[%s]\n" "hostname-smoke" "$hn_out"
+    else
+        printf "FAIL: %-14s exit=%d output=[%s]\n" "hostname-smoke" "$hn_code" "$hn_out"
+        fail_total=$((fail_total + 1))
+    fi
 fi
 
 # ---------------------------------------------------------------
