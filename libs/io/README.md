@@ -1,14 +1,15 @@
 # libs/io/
 
 File-descriptor and filesystem primitives packaged as the static
-archive `libio.a`. Every routine is a direct syscall wrapper —
-no libc, no libSystem call, no allocation. The archive covers
-the syscall-backed portion of POSIX
+archive `libio.a`. Every routine is a direct syscall wrapper (or,
+in `util/`, a small helper composed of syscall wrappers) — no
+libc, no libSystem call, no allocation. The archive covers the
+syscall-backed portion of POSIX
 [`<fcntl.h>`](https://pubs.opengroup.org/onlinepubs/9699919799/basedefs/fcntl.h.html)
 and [`<unistd.h>`](https://pubs.opengroup.org/onlinepubs/9699919799/basedefs/unistd.h.html)
-that a caller needs to open a file, seek within it, and do
-positioned reads and writes without libc's `FILE*` layer sitting
-in front.
+that a caller needs to open a file, seek within it, do positioned
+reads and writes, stat it, and manipulate the surrounding
+namespace — without libc's `FILE*` layer sitting in front.
 
 `read`, `write`, and `close` are deliberately not exported here —
 they already live in [`libsock.a`](../sock/) and are protocol-
@@ -22,6 +23,8 @@ follows.
 
 ## Exported symbols
 
+**v1.0 — file I/O core:**
+
 | Symbol   | Arguments                                        | Returns                              |
 | -------- | ------------------------------------------------ | ------------------------------------ |
 | `open`   | `path`, `flags`, `mode`                          | fd or negative errno                 |
@@ -29,6 +32,34 @@ follows.
 | `lseek`  | `fd`, `offset`, `whence` (SEEK_SET/CUR/END)      | new absolute offset or negative errno |
 | `pread`  | `fd`, `buf`, `count`, `offset`                   | bytes read (0 = EOF) or -errno       |
 | `pwrite` | `fd`, `buf`, `count`, `offset`                   | bytes written or negative errno      |
+
+**v1.1 — metadata + namespace ops:**
+
+| Symbol    | Arguments                        | Returns                       |
+| --------- | -------------------------------- | ----------------------------- |
+| `fstat`   | `fd`, `statbuf*`                 | `0` or negative errno         |
+| `io_size` | `fd`, `out_size*`                | `0` or negative errno         |
+| `unlink`  | `path`                           | `0` or negative errno         |
+| `mkdir`   | `path`, `mode`                   | `0` or negative errno         |
+| `rmdir`   | `path`                           | `0` or negative errno         |
+
+`fstat` writes a caller-supplied stat buffer of size
+`STATBUF_SIZE` (144 bytes on both platforms). The struct
+layout differs — macOS uses `struct stat64`, Linux uses
+`struct stat` — so callers that touch fields other than
+`st_size` must either add named offsets to
+[`syscall/syscall.inc`](syscall/syscall.inc) or accept the
+platform dependency. `io_size` sidesteps this entirely for
+the common case: it fstats the fd internally and writes the
+file size to `out_size` as a signed 64-bit integer, hiding
+the offset behind a portable API.
+
+`unlink`, `mkdir`, and `rmdir` are thin syscall wrappers on
+top of the kernel's namespace ops. `mkdir`'s mode is
+filtered through the caller's umask, matching libc semantics;
+`rmdir` requires the directory to be empty (returns
+`-ENOTEMPTY` otherwise); `unlink` rejects directories with
+`-EPERM` or `-EISDIR` depending on platform.
 
 `openat` takes a `dirfd` argument that scopes relative-path
 resolution to a directory referred to by an fd. The special
@@ -88,6 +119,8 @@ In the consumer's `.asm`:
 
 ```nasm
 extern open, openat, lseek, pread, pwrite
+extern fstat, unlink, mkdir, rmdir      ; v1.1
+extern io_size                          ; v1.1 (util helper)
 ```
 
 In the consumer's `Makefile`, append the archive to the link
@@ -119,26 +152,27 @@ make test
 `make test` builds `libio.a` and runs three smoke tests via the
 harness in [`test/`](test/):
 
-- [`io-smoke.asm`](test/io-smoke.asm) — success path. Opens a
-  temp file created by `mktemp` (path injected via
-  `-DTMPFILE=...`), pwrites `"hello"` at offset 0 and
-  `"world"` at offset 5, checks the file size via
-  `lseek(SEEK_END)`, pread's a substring across the seam, then
-  reopens via `openat(AT_FDCWD, …)` and pread's the tail.
-  Covers each of the five wrappers on a real file.
+- [`io-smoke.asm`](test/io-smoke.asm) — success path. Sub-checks
+  `1..C` cover the v1.0 five wrappers on a real mktemp'd file
+  (pwrite two halves, lseek `SEEK_END` for size, pread across
+  the seam, openat + pread the tail). Sub-checks `D..K` add
+  v1.1: `fstat` populates a stat buffer whose `st_size` at
+  `ST_SIZE_OFF` reads `10`, `io_size` returns the same size
+  portably, `mkdir` + `rmdir` round-trip a scratch dir,
+  and `unlink` succeeds once then fails with `-ENOENT` the
+  second time.
 - [`fail-smoke.asm`](test/fail-smoke.asm) — failure path. Each
   wrapper is called with args the kernel is guaranteed to
   reject (`/proc/libio/does-not-exist-` → `-ENOENT` for
-  `open` and `openat`; `fd=999999` → `-EBADF` for `lseek`,
-  `pread`, `pwrite`). Exercises the macOS `SYSCALL_NORM`
-  `neg rax` line on every one of the five exports.
+  `open`, `openat`, `unlink`, `mkdir`, `rmdir`; `fd=999999` →
+  `-EBADF` for `lseek`, `pread`, `pwrite`, `fstat`). Exercises
+  the macOS `SYSCALL_NORM` `neg rax` line on every export.
 - [`c-smoke.c`](test/c-smoke.c) — verifies `libio.a` is linkable
   and callable from a normal C toolchain. Uses GCC `__asm__`
   labels to bind libio calls to their bare names (bypassing
-  Mach-O's underscore convention) and lets `close`/`unlink`
-  resolve to libc's underscored variants. If the archive ever
-  breaks for C consumers this test catches it before an example
-  does.
+  Mach-O's underscore convention). v1.1: also exercises the
+  new `fstat`, `io_size`, `unlink`, `mkdir`, `rmdir` symbols
+  end-to-end so a C consumer's link line is proven to work.
 
 On success the runner prints one line per test:
 
@@ -150,30 +184,38 @@ PASS: c-smoke      output=[PASS]
 
 Both platforms are exercised on CI.
 
-## What is not here
+## What is not here — yet
 
-For `libio` v1 the surface is deliberately small — the archive
-exists to unblock libresolv reading `/etc/resolv.conf` and
-`/etc/hosts`, not to be a comprehensive filesystem library.
-Missing from this release:
+v1.1 closes the biggest v1 gaps (metadata via `fstat`, portable
+size via `io_size`, and the namespace ops `unlink` / `mkdir` /
+`rmdir`). Still deferred:
 
-- `stat`, `fstat`, `lstat` — the `struct stat` layout differs
-  between Darwin and Linux, and every field access needs an
-  `%ifdef` in NASM. Landing this requires a portable
-  field-offset story, which is scope for v1.1.
+- `stat`, `lstat` — path-based stat variants. `fstat` covers
+  most consumer needs once you have an open fd; a path-based
+  variant is a straightforward wrapper if someone needs it.
 - Directory iteration (`getdents64` on Linux, `getdirentries`
-  on macOS). Same portability story as `stat`, plus a `struct
-  dirent` layout that varies by platform. Deferred.
-- Filesystem mutation (`unlink`, `rename`, `mkdir`, `rmdir`,
-  `chmod`, `chown`, `symlink`, `readlink`, `truncate`). None
-  needed for libresolv; adding them requires designing
-  cross-platform argument handling that is not urgent.
+  on macOS). `struct dirent` layouts vary by platform and the
+  syscall shape differs, so a portable helper is a larger
+  design task.
+- `rename`, `chmod`, `chown`, `symlink`, `readlink`,
+  `truncate` — no consumer needs them yet.
 - `dup`, `dup2`, `pipe` — fd-graph manipulation. Useful for
-  process plumbing but out of scope for the initial file-open
-  surface.
+  process plumbing but out of scope for the file-oriented
+  archive.
 
-Each of these is a candidate for v1.1 or a follow-up archive
-when a real consumer needs it.
+## Utility helpers
+
+`util/` (added in v1.1) holds pure-computation helpers that
+sit on top of one or more syscall wrappers. Currently:
+
+- [`io_size`](util/io-size.asm) — calls `fstat` and extracts
+  `st_size` at the platform-specific offset, storing the
+  result in a caller-supplied `long*`. Removes the need for
+  callers to know that `ST_SIZE_OFF` is `96` on macOS and
+  `48` on Linux.
+
+Future helpers that compose a common file-I/O pattern into
+one call belong here rather than in `syscall/`.
 
 ## See also
 
