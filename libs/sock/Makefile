@@ -45,4 +45,4 @@ test: $(ARCHIVE)
 	bash ./test/run.sh
 
 clean:
-	rm -f $(OBJS) $(ARCHIVE) test/tcp-smoke test/tcp-smoke.o
+	rm -f $(OBJS) $(ARCHIVE) test/*-smoke test/*-smoke.o

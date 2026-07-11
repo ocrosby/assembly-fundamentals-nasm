@@ -8,7 +8,9 @@
 # macOS debug bundles
 *.dSYM/
 
-# Built smoke-test client (the object file is covered by *.o above)
+# Built smoke-test clients (object files are covered by *.o above)
+libs/sock/test/inet4-smoke
+libs/sock/test/inet6-smoke
 libs/sock/test/tcp-smoke
 
 # Built example binaries. Ignore everything inside a numbered example

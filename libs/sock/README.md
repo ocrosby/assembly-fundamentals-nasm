@@ -159,21 +159,43 @@ run `make -C ../../libs/sock` first.
 make test                           # requires python3
 ```
 
-`make test` builds `libsock.a` and `libasm.a`, then runs the
-harness in [`test/`](test/): it starts a loopback server on
-`127.0.0.1` (an ephemeral kernel-assigned port), assembles and
-links the client [`test/tcp-smoke.asm`](test/tcp-smoke.asm)
-against both archives, and checks that a `socket` / `connect` /
-`write` / `read` / `close` round trip returns the server's
-banner. On success it prints:
+`make test` builds `libsock.a` and `libasm.a`, then runs three
+smoke tests in sequence via the harness in [`test/`](test/):
+
+- [`inet4-smoke.asm`](test/inet4-smoke.asm) — exercises the
+  byte-order helpers (`htons`, `htonl`, `ntohs`, `ntohl`) and
+  the strict IPv4 text conversion (`inet_pton4`, `inet_ntop4`)
+  across every documented rejection case (out-of-range octet,
+  leading zero, trailing garbage, missing octet) plus a full
+  round-trip.
+- [`inet6-smoke.asm`](test/inet6-smoke.asm) — exercises
+  `inet_pton6` and `inet_ntop6` across 33 sub-checks: 9
+  successful parses (`::`, `::1`, `1::`, the full 8-group
+  form, `2001:db8::1`, IPv4-mapped `::ffff:192.0.2.1`, mixed
+  case), 14 rejected parses (double `::`, too-many groups,
+  too-few groups, malformed hex, out-of-range IPv4 tail,
+  trailing colon, leading colon, and more), 9 canonical
+  outputs (including the RFC 5952 first-tie compression rule,
+  single-zero-not-compressed, and the IPv4-mapped tail form),
+  the buffer-too-small `NULL` return, and a
+  `pton6` → `ntop6` → `pton6` round-trip.
+- [`tcp-smoke.asm`](test/tcp-smoke.asm) — end-to-end TCP
+  client. Starts a loopback server on `127.0.0.1` (an
+  ephemeral kernel-assigned port) and checks that a `socket`
+  / `connect` / `write` / `read` / `close` round trip returns
+  the server's banner. The server is loopback-only,
+  single-connection, and timeout-bounded, so the test never
+  reaches the network and cannot hang.
+
+On success the runner prints one line per test:
 
 ```text
-PASS: tcp smoke — received: TCP-OK
+PASS: inet4-smoke    output=[PASS]
+PASS: inet6-smoke    output=[PASS]
+PASS: tcp-smoke      output=[TCP-OK]
 ```
 
-The server is loopback-only, single-connection, and
-timeout-bounded, so the test never reaches the network and
-cannot hang. It runs on both macOS and Linux under CI.
+All three run on both macOS and Linux under CI.
 
 ## Source layout
 
