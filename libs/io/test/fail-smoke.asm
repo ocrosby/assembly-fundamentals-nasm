@@ -28,6 +28,13 @@
 ;   G truncate    — bad path  → -ENOENT         (v1.3)
 ;   H ftruncate   — fd=999999 → -EBADF          (v1.3)
 ;   I getdents    — fd=999999 → -EBADF          (v1.4)
+;   J unlinkat    — dirfd=999999 → -EBADF        (v1.5)
+;   K mkdirat     — dirfd=999999 → -EBADF        (v1.5)
+;   L renameat    — both dirfds bad → -EBADF     (v1.5)
+;   M fstatat     — dirfd=999999 → -EBADF        (v1.5)
+;   N symlinkat   — dirfd=999999 → -EBADF        (v1.5)
+;   O linkat      — both dirfds bad → -EBADF     (v1.5)
+;   P readlinkat  — dirfd=999999 → -EBADF        (v1.5)
 ;
 ; Prints "PASS\n" and exits 0 when every wrapper returned a
 ; negative value from its intentionally-broken call. Prints
@@ -58,6 +65,7 @@ extern fstat, unlink, mkdir, rmdir
 extern stat, rename
 extern lstat, chmod, chown, symlink, readlink, truncate, ftruncate
 extern getdents
+extern unlinkat, mkdirat, renameat, fstatat, symlinkat, linkat, readlinkat
 
 global _start
 global _main
@@ -223,6 +231,62 @@ _main:
                                      ; short-circuited by EBADF
     call getdents
     EXPECT_NEGATIVE 'I'
+
+    ; J: unlinkat(BAD_FD, bad_path, 0) -> -EBADF
+    ; bad_path is absolute but the kernel checks BAD_FD first
+    ; on both platforms — the errno is deterministic.
+    mov edi, BAD_FD
+    lea rsi, [bad_path]
+    xor edx, edx
+    call unlinkat
+    EXPECT_NEGATIVE 'J'
+
+    ; K: mkdirat(BAD_FD, bad_path, 0755) -> -EBADF
+    mov edi, BAD_FD
+    lea rsi, [bad_path]
+    mov edx, 0755q
+    call mkdirat
+    EXPECT_NEGATIVE 'K'
+
+    ; L: renameat(BAD_FD, bad_path, BAD_FD, bad_path2) -> -EBADF
+    mov edi, BAD_FD
+    lea rsi, [bad_path]
+    mov edx, BAD_FD
+    lea rcx, [bad_path2]
+    call renameat
+    EXPECT_NEGATIVE 'L'
+
+    ; M: fstatat(BAD_FD, bad_path, buf, 0) -> -EBADF
+    mov edi, BAD_FD
+    lea rsi, [bad_path]
+    lea rdx, [buf]
+    xor ecx, ecx
+    call fstatat
+    EXPECT_NEGATIVE 'M'
+
+    ; N: symlinkat(bad_path, BAD_FD, bad_path2) -> -EBADF
+    lea rdi, [bad_path]
+    mov esi, BAD_FD
+    lea rdx, [bad_path2]
+    call symlinkat
+    EXPECT_NEGATIVE 'N'
+
+    ; O: linkat(BAD_FD, bad_path, BAD_FD, bad_path2, 0) -> -EBADF
+    mov edi, BAD_FD
+    lea rsi, [bad_path]
+    mov edx, BAD_FD
+    lea rcx, [bad_path2]
+    xor r8d, r8d
+    call linkat
+    EXPECT_NEGATIVE 'O'
+
+    ; P: readlinkat(BAD_FD, bad_path, buf, 32) -> -EBADF
+    mov edi, BAD_FD
+    lea rsi, [bad_path]
+    lea rdx, [buf]
+    mov ecx, 32
+    call readlinkat
+    EXPECT_NEGATIVE 'P'
 
     ; PASS
     mov rax, SYS_write

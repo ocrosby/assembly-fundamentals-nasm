@@ -58,6 +58,11 @@ iter_dir="$(mktemp -d /tmp/libio-smoke.iter.XXXXXX)"
 : > "$iter_dir/a"
 : > "$iter_dir/b"
 : > "$iter_dir/c"
+# v1.5: AT_DIR is created empty here; the smoke test opens it,
+# populates it via the *at() family, then unlinks the contents
+# and closes the dirfd. Any leftover on failure is caught by
+# the trap's rm -rf.
+at_dir="$(mktemp -d /tmp/libio-smoke.at.XXXXXX)"
 cleanup() {
     # Sub-checks in io-smoke unlink each of the paths above on
     # the happy path (N: renamed_path, b: symlink_path, c:
@@ -68,7 +73,8 @@ cleanup() {
           fail-smoke fail-smoke.o \
           c-smoke /tmp/libio-c-smoke.tmp /tmp/libio-c-smoke.tmp2 \
                   /tmp/libio-c-smoke.link
-    rm -rf "$dirpath" "$iter_dir" /tmp/libio-c-smoke.iter
+    rm -rf "$dirpath" "$iter_dir" "$at_dir" \
+           /tmp/libio-c-smoke.iter /tmp/libio-c-smoke.at
 }
 trap cleanup EXIT
 
@@ -87,6 +93,7 @@ nasm $nasm_fmt -I../syscall/ \
     -DTMPFILE_V13="\"$tmpfile_v13\"" \
     -DSYMLINK_PATH="\"$symlink_path\"" \
     -DITER_DIR="\"$iter_dir\"" \
+    -DAT_DIR="\"$at_dir\"" \
     io-smoke.asm -o io-smoke.o
 "${ld_cmd[@]}" io-smoke.o "${libs[@]}" -o io-smoke
 

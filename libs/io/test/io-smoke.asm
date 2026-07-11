@@ -63,6 +63,22 @@
 ;       written into the fixture by run.sh)
 ;   f  dir_iter_close(iter)                         → 0
 ;
+; v1.5 *at() family (AT_DIR is a fresh mktemp'd dir created
+; by run.sh; all subsequent ops are scoped through its dirfd):
+;   g  open(AT_DIR, O_RDONLY, 0)                    → dirfd
+;   h  mkdirat(dirfd, "sub", 0755)                  → 0
+;   i  unlinkat(dirfd, "sub", AT_REMOVEDIR)         → 0
+;   j  openat(dirfd, "f", O_CREAT|O_RDWR, 0644)     → close
+;   k  renameat(dirfd, "f", dirfd, "g")             → 0
+;   l  fstatat(dirfd, "g", statbuf, 0)              → 0
+;   m  symlinkat("g", dirfd, "ln")                  → 0
+;   n  readlinkat(dirfd, "ln", linkbuf, 128)        → > 0
+;   o  linkat(dirfd, "g", dirfd, "h", 0)            → 0
+;   p  unlinkat(dirfd, "g", 0)                      → 0
+;   q  unlinkat(dirfd, "ln", 0)                     → 0
+;   r  unlinkat(dirfd, "h", 0)                      → 0
+;   s  close(dirfd)                                 → 0
+;
 ; TMPFILE is a path the harness generates via mktemp and injects
 ; via `-DTMPFILE="..."`; run.sh removes it after the test.
 ;
@@ -87,6 +103,9 @@
 %endif
 %ifndef ITER_DIR
 %define ITER_DIR "/tmp/libio-smoke-iter-default"
+%endif
+%ifndef AT_DIR
+%define AT_DIR "/tmp/libio-smoke-at-default"
 %endif
 
 ; Pull in libio's syscall.inc for STATBUF_SIZE and ST_SIZE_OFF —
@@ -139,6 +158,7 @@ extern open, openat, lseek, pread, pwrite
 extern fstat, unlink, mkdir, rmdir
 extern stat, rename
 extern lstat, chmod, chown, symlink, readlink, truncate, ftruncate
+extern unlinkat, mkdirat, renameat, fstatat, symlinkat, linkat, readlinkat
 extern io_size
 extern dir_iter_open, dir_iter_next, dir_iter_close
 
@@ -152,6 +172,16 @@ renamed_path: db RENAMED_PATH, 0
 tmpfile_v13:  db TMPFILE_V13, 0
 symlink_path: db SYMLINK_PATH, 0
 iter_dir:     db ITER_DIR, 0
+at_dir:       db AT_DIR, 0
+
+; short relative names for the *at() family; all resolved
+; against the dirfd r15 holds during v1.5 sub-checks.
+at_sub:       db "sub", 0
+at_f:         db "f", 0
+at_g:         db "g", 0
+at_h:         db "h", 0
+at_ln:        db "ln", 0
+
 hello:        db "hello"
 world:        db "world"
 tenbytes:     db "abcdefghij"
@@ -581,6 +611,146 @@ _main:
     mov byte [fail_id], 'f'
     lea rdi, [iter]
     call dir_iter_close
+    test rax, rax
+    jnz .fail
+
+    ; ---- g: open(AT_DIR, O_RDONLY, 0) → dirfd ----
+    ; r15 holds dirfd across every v1.5 sub-check.
+    mov byte [fail_id], 'g'
+    lea rdi, [at_dir]
+    mov esi, O_RDONLY
+    xor edx, edx
+    call open
+    test rax, rax
+    js .fail
+    mov r15, rax                     ; dirfd
+
+    ; ---- h: mkdirat(dirfd, "sub", 0755) → 0 ----
+    mov byte [fail_id], 'h'
+    mov rdi, r15
+    lea rsi, [at_sub]
+    mov edx, 0755q
+    call mkdirat
+    test rax, rax
+    jnz .fail
+
+    ; ---- i: unlinkat(dirfd, "sub", AT_REMOVEDIR) → 0 ----
+    mov byte [fail_id], 'i'
+    mov rdi, r15
+    lea rsi, [at_sub]
+    mov edx, AT_REMOVEDIR
+    call unlinkat
+    test rax, rax
+    jnz .fail
+
+    ; ---- j: openat(dirfd, "f", O_CREAT|O_RDWR, 0644) → close ----
+    mov byte [fail_id], 'j'
+    mov rdi, r15
+    lea rsi, [at_f]
+    mov edx, O_CREAT | O_RDWR
+    mov ecx, 0644q
+    call openat
+    test rax, rax
+    js .fail
+    ; close the fd immediately — we only needed it to create "f".
+    mov rdi, rax
+    mov rax, SYS_close
+    syscall
+%ifdef MACOS
+    jnc .close_at_f_ok
+    neg rax
+.close_at_f_ok:
+%endif
+    test rax, rax
+    jnz .fail
+
+    ; ---- k: renameat(dirfd, "f", dirfd, "g") → 0 ----
+    mov byte [fail_id], 'k'
+    mov rdi, r15
+    lea rsi, [at_f]
+    mov rdx, r15
+    lea rcx, [at_g]
+    call renameat
+    test rax, rax
+    jnz .fail
+
+    ; ---- l: fstatat(dirfd, "g", statbuf, 0) → 0 ----
+    mov byte [fail_id], 'l'
+    mov rdi, r15
+    lea rsi, [at_g]
+    lea rdx, [statbuf]
+    xor ecx, ecx
+    call fstatat
+    test rax, rax
+    jnz .fail
+
+    ; ---- m: symlinkat("g", dirfd, "ln") → 0 ----
+    mov byte [fail_id], 'm'
+    lea rdi, [at_g]
+    mov rsi, r15
+    lea rdx, [at_ln]
+    call symlinkat
+    test rax, rax
+    jnz .fail
+
+    ; ---- n: readlinkat(dirfd, "ln", linkbuf, 128) > 0 ----
+    mov byte [fail_id], 'n'
+    mov rdi, r15
+    lea rsi, [at_ln]
+    lea rdx, [linkbuf]
+    mov ecx, 128
+    call readlinkat
+    test rax, rax
+    jle .fail
+
+    ; ---- o: linkat(dirfd, "g", dirfd, "h", 0) → 0 ----
+    mov byte [fail_id], 'o'
+    mov rdi, r15
+    lea rsi, [at_g]
+    mov rdx, r15
+    lea rcx, [at_h]
+    xor r8d, r8d
+    call linkat
+    test rax, rax
+    jnz .fail
+
+    ; ---- p: unlinkat(dirfd, "g", 0) → 0 ----
+    mov byte [fail_id], 'p'
+    mov rdi, r15
+    lea rsi, [at_g]
+    xor edx, edx
+    call unlinkat
+    test rax, rax
+    jnz .fail
+
+    ; ---- q: unlinkat(dirfd, "ln", 0) → 0 ----
+    mov byte [fail_id], 'q'
+    mov rdi, r15
+    lea rsi, [at_ln]
+    xor edx, edx
+    call unlinkat
+    test rax, rax
+    jnz .fail
+
+    ; ---- r: unlinkat(dirfd, "h", 0) → 0 ----
+    mov byte [fail_id], 'r'
+    mov rdi, r15
+    lea rsi, [at_h]
+    xor edx, edx
+    call unlinkat
+    test rax, rax
+    jnz .fail
+
+    ; ---- s: close(dirfd) via raw syscall ----
+    mov byte [fail_id], 's'
+    mov rdi, r15
+    mov rax, SYS_close
+    syscall
+%ifdef MACOS
+    jnc .close_at_dir_ok
+    neg rax
+.close_at_dir_ok:
+%endif
     test rax, rax
     jnz .fail
 
