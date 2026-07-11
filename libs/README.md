@@ -28,6 +28,7 @@ All archives in this directory share the same conventions:
 | [`asm/`](asm/)    | `libasm.a`  | Formatting and process helpers (`print_string`, `print_int`, `sys_exit`).                      |
 | [`sock/`](sock/)  | `libsock.a` | Berkeley sockets syscall wrappers plus `<arpa/inet.h>` byte-order and IPv4/IPv6 text helpers.  |
 | [`io/`](io/)      | `libio.a`   | File-descriptor primitives from `<fcntl.h>` / `<unistd.h>` (`open`, `openat`, `lseek`, `pread`, `pwrite`). |
+| [`resolv/`](resolv/) | `libresolv.a` | DNS A-record resolver over UDP. Wire encode / decode plus a `resolv_a(name, resolver, port, out_ip)` entry point built on `libsock`. |
 
 Each subdirectory's `README.md` documents the exported symbols and
 calling conventions for that archive.
@@ -40,10 +41,12 @@ Each archive is built independently:
 make -C libs/asm
 make -C libs/sock
 make -C libs/io
+make -C libs/resolv
 ```
 
-There is no aggregate `libs/Makefile` yet — three archives is still
-worth building individually since each has its own test suite.
+There is no aggregate `libs/Makefile` yet — each archive has its own
+test suite and its own dependency graph (`libresolv` builds `libsock`
+as a prerequisite; the others are independent).
 
 ## Linking against multiple archives
 

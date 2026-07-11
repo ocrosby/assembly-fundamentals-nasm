@@ -126,3 +126,7 @@ jobs:
       - name: Build and smoke-test the file-I/O library
         shell: bash
         run: make -C libs/io test
+
+      - name: Build and smoke-test the DNS resolver library
+        shell: bash
+        run: make -C libs/resolv test
