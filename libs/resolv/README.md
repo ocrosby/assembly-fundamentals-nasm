@@ -6,7 +6,9 @@ format defined by
 [RFC 1035](https://www.rfc-editor.org/rfc/rfc1035.html), sends
 it to a caller-supplied resolver over UDP via
 [`libsock`](../sock/), waits for the response with a bounded
-timeout, and parses out the first A record.
+timeout, and parses the answer section into either a single
+address (A or AAAA), a packed list of addresses, or a CNAME
+target (chased transparently up to eight hops).
 
 Every routine is a direct syscall (through `libsock`) or pure
 computation — no libc, no libSystem call, no allocation. Same
@@ -23,8 +25,9 @@ follows.
 | Symbol                     | Arguments                                                     | Returns                                    |
 | -------------------------- | ------------------------------------------------------------- | ------------------------------------------ |
 | `resolv_a`                 | `name`, `resolver_ip`, `port`, `out_ip*`                      | `0` on success, negative errno on failure  |
-| `resolv_encode_query`      | `name`, `id`, `out_buf*`                                      | wire length or negative errno              |
-| `resolv_decode_response`   | `buf*`, `len`, `expected_id`, `out_ip*`                       | `0` on success, negative errno on failure  |
+| `resolv_encode_query`      | `name`, `id`, `qtype`, `out_buf*`                             | wire length or negative errno              |
+| `resolv_decode_records`    | `buf*`, `len`, `expected_id`, `qtype`, `out_buf*`, `max_count`| count copied (`>= 0`) or negative errno    |
+| `resolv_decode_cname`      | `buf*`, `len`, `expected_id`, `out_name*`, `out_capacity`     | `0` on success, negative errno on failure  |
 | `resolv_random`            | `buf*`, `len`                                                 | non-negative on success, negative errno on failure |
 
 **v1.1 — /etc/hosts + /etc/resolv.conf integration:**
@@ -35,6 +38,27 @@ follows.
 | `resolv_conf_read`         | `path`, `out_ip*`                                                      | `0` on success, `-ENOENT` if no nameserver, `-errno` on file error |
 | `resolv_hostname_at`       | `hosts_path`, `conf_path`, `name`, `out_ip*`                           | `0` on success, negative errno on failure  |
 | `resolv_hostname`          | `name`, `out_ip*`                                                      | `0` on success, negative errno on failure  |
+
+**v1.2 — AAAA, CNAME chasing, and multi-record variants:**
+
+| Symbol                     | Arguments                                                     | Returns                                    |
+| -------------------------- | ------------------------------------------------------------- | ------------------------------------------ |
+| `resolv_aaaa`              | `name`, `resolver_ip`, `port`, `out_ip16*`                    | `0` on success, negative errno on failure  |
+| `resolv_a_all`             | `name`, `resolver_ip`, `port`, `out_buf*`, `max_count`        | count copied (`>= 1`) or negative errno    |
+| `resolv_aaaa_all`          | `name`, `resolver_ip`, `port`, `out_buf*`, `max_count`        | count copied (`>= 1`) or negative errno    |
+| `resolv_query`             | `name`, `resolver_ip`, `port`, `qtype`, `out_buf*`, `max_count` | count copied or negative errno           |
+
+`resolv_a` continues to work exactly as before; v1.2 wires it
+through the shared `resolv_query` workhorse under the hood, so
+it now chases CNAMEs transparently up to eight hops. The hop
+counter starts at 8 and returns `-ELOOP` (macOS `-62`,
+Linux `-40`) when it hits zero, so a resolver that echoes an
+infinite loop cannot lock the caller up.
+
+`resolv_query` is the raw entry point — set `qtype` to any of
+the values the decoder supports (`1` for A, `28` for AAAA) and
+`max_count` to bound the copies. The wrappers above are thin
+argument shuffles on top.
 
 `resolv_hostname` is the highest-level entry point for
 production consumers — it composes the /etc/hosts lookup, the
@@ -70,6 +94,7 @@ so callers can `if (rax < 0)` uniformly:
 | `-EIO`             | `-5`       | DNS `SERVFAIL`, or any RCODE without a more specific map    |
 | `-ENODATA`         | `-96` (macOS) / `-61` (Linux) | Well-formed response with no A/IN answer |
 | `-EBADMSG`         | `-74`      | Response truncated, ID mismatch, bad compression pointer    |
+| `-ELOOP`           | `-62` (macOS) / `-40` (Linux) | CNAME chain exceeded the 8-hop limit |
 | `-ETIMEDOUT`       | `-60` (macOS) / `-110` (Linux) | recvfrom timed out (5-second default) |
 | any libsock errno  | (various)  | Underlying socket call failed; the wrapper's errno is passed through |
 
@@ -79,12 +104,10 @@ constant in `resolv-a.asm`. Future work (v1.1) exposes it as a
 
 ## What is not here — yet
 
-v1.1 adds `/etc/resolv.conf` and `/etc/hosts` integration on
-top of v1.0's wire-format primitives. Still deferred:
+v1.2 covers AAAA lookups, CNAME chasing, and multi-record
+answers on top of v1.0's wire-format primitives and v1.1's
+file integration. Still deferred:
 
-- AAAA (IPv6) records — same wire pattern, another QTYPE
-- CNAME chasing — follow-the-alias loop with a hop cap
-- Multi-record responses — return more than the first A
 - TCP fallback on the truncated (`TC=1`) response
 - Multiple resolvers with failover — currently only the first
   `nameserver` in `/etc/resolv.conf` is used
@@ -93,6 +116,8 @@ top of v1.0's wire-format primitives. Still deferred:
 - Search-domain iteration
 - Query retry with backoff across multiple resolvers
 - DNSSEC signature validation — would drag crypto into scope
+- `resolv_hostname` still returns only IPv4 — the AAAA-aware
+  counterpart (`resolv_hostname6` / a family argument) is v1.3
 
 Each of these is a real user story worth writing, but each is
 also a chapter of NASM in its own right. Adding them speculatively
@@ -175,7 +200,7 @@ make test                           # requires python3
 ```
 
 `make test` builds `libresolv.a`, `libsock.a`, `libio.a`, and
-`libasm.a`, then runs six smoke tests via the harness in
+`libasm.a`, then runs seven smoke tests via the harness in
 [`test/`](test/):
 
 - [`resolv-smoke.asm`](test/resolv-smoke.asm) + `mock-dns.py` —
@@ -188,6 +213,13 @@ make test                           # requires python3
   `resolv_a` return code, plus a fifth sub-check that the
   empty name is rejected at the encode step (`-EINVAL`)
   without ever hitting the network.
+- [`v12-smoke.asm`](test/v12-smoke.asm) — exercises the v1.2
+  additions against the same mock: AAAA success (single 16-byte
+  answer), CNAME chase from `libresolv-cname.test` to the A
+  record for `libresolv-ok.test`, hop-limit trip via a
+  self-referential CNAME loop (`-ELOOP`), multi-record A with
+  `resolv_a_all` (three records for `libresolv-multi.test`),
+  and A on an AAAA-only name that comes back as `-ENODATA`.
 - [`fail-smoke.asm`](test/fail-smoke.asm) — every libresolv-
   owned syscall wrapper's failure branch. `resolv_random` is
   the only fresh syscall the archive contributes; every other
@@ -221,6 +253,7 @@ On success the runner prints one line per test:
 
 ```text
 PASS: resolv-smoke   output=[PASS]
+PASS: v12-smoke      output=[PASS]
 PASS: hosts-smoke    output=[PASS]
 PASS: resolvconf-smoke output=[PASS]
 PASS: hostname-smoke output=[PASS]

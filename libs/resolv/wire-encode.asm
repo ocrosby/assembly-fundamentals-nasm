@@ -1,8 +1,11 @@
-; resolv_encode_query(name: rdi, id: rsi, out_buf: rdx)
+; resolv_encode_query(name: rdi, id: rsi, qtype: rdx, out_buf: rcx)
 ;     -> rax = total bytes written, or -EINVAL on malformed name
 ;
-; Builds a well-formed DNS query for an A record. The output at
-; *out_buf* looks like:
+; Builds a well-formed DNS query for the requested QTYPE
+; (typically 1 for A or 28 for AAAA — the encoder does not
+; validate qtype; the wire format is the same for any RR type
+; and the resolver rejects anything it cannot decode). The
+; output at *out_buf* looks like:
 ;
 ;     +-------------------------------+ 12 bytes
 ;     |  DNS header                   |
@@ -19,7 +22,7 @@
 ;     |    03 c o m                    |
 ;     |    00                          |
 ;     +-------------------------------+
-;     |  QTYPE  = 1  (A, net)          |
+;     |  QTYPE  = qtype (u16, net)     |
 ;     |  QCLASS = 1  (IN, net)         |
 ;     +-------------------------------+
 ;
@@ -48,10 +51,11 @@ global resolv_encode_query
 
 section .text
 
-%define QTYPE_A   1
 %define QCLASS_IN 1
 
 ; Register roles for the duration of the function:
+;   r10d= qtype (u16 in low bits; caller-saved, safe here
+;               because we make no calls)
 ;   r12 = name walker (advances one char at a time)
 ;   r13 = out cursor  (advances as bytes are written)
 ;   r14 = out base    (unchanged; used to compute final length)
@@ -74,8 +78,9 @@ resolv_encode_query:
     jz .invalid
 
     mov r12, rdi                    ; name walker
-    mov r13, rdx                    ; out cursor
-    mov r14, rdx                    ; out base
+    mov r13, rcx                    ; out cursor
+    mov r14, rcx                    ; out base
+    mov r10d, edx                   ; qtype (u16 in low bits)
 
     ; ---- Header (12 bytes) ----
     ; ID (u16 net): swap host-order id then store big-endian.
@@ -138,7 +143,10 @@ resolv_encode_query:
     inc r13
 
     ; ---- QTYPE + QCLASS ----
-    mov word [r13], 0x0100          ; QTYPE = A (net) = 00 01
+    ; QTYPE: host-order qtype → network-order via rol.
+    mov ax, r10w
+    rol ax, 8
+    mov [r13], ax
     mov word [r13 + 2], 0x0100      ; QCLASS = IN (net) = 00 01
     add r13, 4
 

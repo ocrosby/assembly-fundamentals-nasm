@@ -50,6 +50,7 @@ cleanup() {
         hosts-smoke hosts-smoke.o \
         resolvconf-smoke resolvconf-smoke.o \
         hostname-smoke hostname-smoke.o \
+        v12-smoke v12-smoke.o \
         fail-smoke fail-smoke.o c-smoke
 }
 trap cleanup EXIT
@@ -130,6 +131,46 @@ else
         printf "PASS: %-12s output=[%s]\n" "resolv-smoke" "$r_out"
     else
         printf "FAIL: %-12s exit=%d output=[%s]\n" "resolv-smoke" "$r_code" "$r_out"
+        fail_total=$((fail_total + 1))
+    fi
+fi
+
+# ---------------------------------------------------------------
+# v12-smoke — needs its own mock instance (the previous one
+# exits after resolv-smoke drains it) on a fresh ephemeral port.
+# ---------------------------------------------------------------
+portfile2="$tmp/port2"
+python3 mock-dns.py "$portfile2" &
+srv=$!
+
+port2=""
+for _ in $(seq 1 100); do
+    if [ -f "$portfile2" ]; then
+        port2="$(cat "$portfile2")"
+        break
+    fi
+    sleep 0.05
+done
+if [ -z "$port2" ]; then
+    printf "FAIL: %-12s (mock did not publish a port within ~5s)\n" "v12-smoke"
+    fail_total=$((fail_total + 1))
+else
+    # shellcheck disable=SC2086
+    nasm $nasm_fmt -DDNS_PORT="$port2" v12-smoke.asm -o v12-smoke.o
+    "${ld_cmd[@]}" v12-smoke.o "${libs[@]}" -o v12-smoke
+
+    set +e
+    v12_out="$(./v12-smoke 2>&1)"
+    v12_code=$?
+    set -e
+
+    wait "$srv" 2>/dev/null || true
+    srv=""
+
+    if [ "$v12_code" -eq 0 ]; then
+        printf "PASS: %-12s output=[%s]\n" "v12-smoke" "$v12_out"
+    else
+        printf "FAIL: %-12s exit=%d output=[%s]\n" "v12-smoke" "$v12_code" "$v12_out"
         fail_total=$((fail_total + 1))
     fi
 fi

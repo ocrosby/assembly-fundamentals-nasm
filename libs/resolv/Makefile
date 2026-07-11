@@ -8,7 +8,11 @@ SRCS := \
     wire-encode.asm \
     wire-decode.asm \
     random.asm \
+    resolv-query.asm \
     resolv-a.asm \
+    resolv-aaaa.asm \
+    resolv-a-all.asm \
+    resolv-aaaa-all.asm \
     hosts.asm \
     resolvconf.asm \
     hostname.asm
