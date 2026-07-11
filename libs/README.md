@@ -26,7 +26,7 @@ All archives in this directory share the same conventions:
 | Path              | Archive     | Purpose                                                                                        |
 | ----------------- | ----------- | ---------------------------------------------------------------------------------------------- |
 | [`asm/`](asm/)    | `libasm.a`  | Formatting and process helpers (`print_string`, `print_int`, `sys_exit`).                      |
-| [`tcp/`](tcp/)    | `libtcp.a`  | TCP socket primitives (`tcp_connect`, `tcp_send`, `tcp_recv`, `tcp_close`).                    |
+| [`sock/`](sock/)  | `libsock.a` | Berkeley sockets syscall wrappers plus `<arpa/inet.h>` byte-order and IPv4/IPv6 text helpers.  |
 
 Each subdirectory's `README.md` documents the exported symbols and
 calling conventions for that archive.
@@ -37,7 +37,7 @@ Each archive is built independently:
 
 ```bash
 make -C libs/asm
-make -C libs/tcp
+make -C libs/sock
 ```
 
 There is no aggregate `libs/Makefile` yet — two archives is not enough
@@ -49,13 +49,13 @@ Consumer binaries list every archive they use on the `ld` command
 line. Static-archive linkers scan left-to-right for unresolved
 symbols, so the archive containing the *references* must appear
 before the archive containing the *definitions*. When a future
-`libhttp.a` calls into `libtcp.a`, for instance:
+`libhttp.a` calls into `libsock.a`, for instance:
 
 ```
-ld ... consumer.o libhttp.a libtcp.a -o consumer
+ld ... consumer.o libhttp.a libsock.a -o consumer
 ```
 
-When both archives are independent — as `libasm.a` and `libtcp.a` are
+When both archives are independent — as `libasm.a` and `libsock.a` are
 today — the order does not matter.
 
 ## Platform notes

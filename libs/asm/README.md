@@ -9,8 +9,8 @@ of the syscall numbers lives in exactly one place.
 See [`../README.md`](../README.md) for the conventions shared by every
 archive in `libs/` (calling convention, error convention, no-libc
 policy). This archive predates the split into subdirectories — it
-was the seed of `libs/` and moved down one level when `libs/tcp/`
-was added.
+was the seed of `libs/` and moved down one level when
+[`libs/sock/`](../sock/) was added.
 
 ## Exported symbols
 
@@ -80,8 +80,8 @@ the consumer Makefile.
 
 ## See also
 
-- [`../tcp/`](../tcp/) — TCP socket primitives (`tcp_connect`,
-  `tcp_send`, `tcp_recv`, `tcp_close`).
+- [`../sock/`](../sock/) — Berkeley sockets syscall wrappers plus
+  the `<arpa/inet.h>` byte-order and IPv4/IPv6 text helpers.
 - [`../../docs/14-procedures.md`](../../docs/14-procedures.md) — the
   System V AMD64 calling convention these helpers follow.
 - [`../../examples/20-shared-lib/`](../../examples/20-shared-lib/) —
