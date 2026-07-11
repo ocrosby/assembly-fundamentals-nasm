@@ -36,27 +36,35 @@
 %define SYS_lseek  0x20000c7
 %define SYS_openat 0x20001cf
 ; v1.1: metadata + namespace ops.
-; SYS_fstat here is Darwin's 64-bit-inode variant
-; (fstat64 = BSD syscall 339). The older SYS_fstat (189)
-; returns a struct with 32-bit inode numbers that macOS
-; deprecated once wide inodes shipped, so libio wraps the
-; wider one.
+; SYS_fstat / SYS_stat here are Darwin's 64-bit-inode
+; variants (fstat64 = BSD syscall 339, stat64 = 338). The
+; older SYS_fstat (189) / SYS_stat (188) return a struct
+; with 32-bit inode numbers that macOS deprecated once wide
+; inodes shipped; libio wraps the wider pair so callers see
+; identical field offsets across the two symbols.
 %define SYS_unlink 0x200000a
 %define SYS_mkdir  0x2000088
 %define SYS_rmdir  0x2000089
 %define SYS_fstat  0x2000153
+; v1.2 additions.
+%define SYS_stat   0x2000152
+%define SYS_rename 0x2000080
 %else
 %define SYS_open   2
 %define SYS_lseek  8
 %define SYS_pread  17
 %define SYS_pwrite 18
 %define SYS_openat 257
-; v1.1 additions on Linux. SYS_fstat = 5 already returns the
-; 64-bit stat struct on x86_64, so no fstat64 syscall exists.
+; v1.1 additions on Linux. SYS_fstat / SYS_stat = 5 / 4 already
+; return the 64-bit stat struct on x86_64, so no fstat64/stat64
+; syscall exists.
 %define SYS_unlink 87
 %define SYS_mkdir  83
 %define SYS_rmdir  84
 %define SYS_fstat  5
+; v1.2 additions.
+%define SYS_stat   4
+%define SYS_rename 82
 %endif
 
 ; The stat struct is 144 bytes on both macOS (`struct stat64`)

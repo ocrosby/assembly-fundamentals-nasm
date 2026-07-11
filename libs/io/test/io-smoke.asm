@@ -27,8 +27,15 @@
 ; v1.1 namespace ops (independent of the tempfile above):
 ;   H  mkdir(DIRPATH, 0755)                         → 0
 ;   I  rmdir(DIRPATH)                               → 0
-;   J  unlink(TMPFILE)                              → 0
-;   K  unlink(TMPFILE)  (already gone)              → < 0
+;
+; v1.2 metadata + rename (chained through TMPFILE):
+;   J  stat(TMPFILE, statbuf), st_size at
+;      ST_SIZE_OFF                                  → 10
+;   K  rename(TMPFILE, RENAMED_PATH)                → 0
+;   L  stat(TMPFILE, statbuf)  (source gone)        → < 0
+;   M  stat(RENAMED_PATH, statbuf), st_size         → 10
+;   N  unlink(RENAMED_PATH)                         → 0
+;   O  unlink(RENAMED_PATH) (already gone)          → < 0
 ;
 ; TMPFILE is a path the harness generates via mktemp and injects
 ; via `-DTMPFILE="..."`; run.sh removes it after the test.
@@ -42,6 +49,9 @@
 %endif
 %ifndef DIRPATH
 %define DIRPATH "/tmp/libio-smoke-dir-default"
+%endif
+%ifndef RENAMED_PATH
+%define RENAMED_PATH "/tmp/libio-smoke-renamed-default"
 %endif
 
 ; Pull in libio's syscall.inc for STATBUF_SIZE and ST_SIZE_OFF —
@@ -89,17 +99,19 @@ default rel
 
 extern open, openat, lseek, pread, pwrite
 extern fstat, unlink, mkdir, rmdir
+extern stat, rename
 extern io_size
 
 global _start
 global _main
 
 section .rodata
-tmpfile:  db TMPFILE, 0
-dirpath:  db DIRPATH, 0
-hello:    db "hello"
-world:    db "world"
-exp_low:  db "lowo"
+tmpfile:      db TMPFILE, 0
+dirpath:      db DIRPATH, 0
+renamed_path: db RENAMED_PATH, 0
+hello:        db "hello"
+world:        db "world"
+exp_low:      db "lowo"
 
 pass_msg: db "PASS", 10
 pass_len: equ $ - pass_msg
@@ -303,19 +315,57 @@ _main:
     test rax, rax
     jnz .fail
 
-    ; ---- J: unlink(TMPFILE) → 0 ----
+    ; ---- J: stat(TMPFILE, statbuf) → 0, st_size == 10 ----
     mov byte [fail_id], 'J'
     lea rdi, [tmpfile]
+    lea rsi, [statbuf]
+    call stat
+    test rax, rax
+    jnz .fail
+    mov rax, [statbuf + ST_SIZE_OFF]
+    cmp rax, 10
+    jne .fail
+
+    ; ---- K: rename(TMPFILE, RENAMED_PATH) → 0 ----
+    mov byte [fail_id], 'K'
+    lea rdi, [tmpfile]
+    lea rsi, [renamed_path]
+    call rename
+    test rax, rax
+    jnz .fail
+
+    ; ---- L: stat(TMPFILE, statbuf) → < 0 (source gone) ----
+    mov byte [fail_id], 'L'
+    lea rdi, [tmpfile]
+    lea rsi, [statbuf]
+    call stat
+    test rax, rax
+    jns .fail
+
+    ; ---- M: stat(RENAMED_PATH, statbuf) → 0, st_size == 10 ----
+    mov byte [fail_id], 'M'
+    lea rdi, [renamed_path]
+    lea rsi, [statbuf]
+    call stat
+    test rax, rax
+    jnz .fail
+    mov rax, [statbuf + ST_SIZE_OFF]
+    cmp rax, 10
+    jne .fail
+
+    ; ---- N: unlink(RENAMED_PATH) → 0 ----
+    mov byte [fail_id], 'N'
+    lea rdi, [renamed_path]
     call unlink
     test rax, rax
     jnz .fail
 
-    ; ---- K: unlink(TMPFILE) again → < 0 (already gone) ----
-    mov byte [fail_id], 'K'
-    lea rdi, [tmpfile]
+    ; ---- O: unlink(RENAMED_PATH) again → < 0 (already gone) ----
+    mov byte [fail_id], 'O'
+    lea rdi, [renamed_path]
     call unlink
     test rax, rax
-    jns .fail                        ; want negative
+    jns .fail
 
     ; PASS
     mov rax, SYS_write

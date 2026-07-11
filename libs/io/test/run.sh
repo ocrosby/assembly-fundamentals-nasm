@@ -45,14 +45,18 @@ tmpfile="$(mktemp /tmp/libio-smoke.XXXXXX)"
 # disk, the trap below rm -rf's it.
 dirpath="$(mktemp -d /tmp/libio-smoke.dir.XXXXXX)"
 rmdir "$dirpath"                       # H recreates it
+# Same dance for RENAMED_PATH: mktemp reserves a name that we
+# then remove — sub-check K needs the destination to be absent
+# so the rename creates a fresh entry rather than replacing.
+renamed_path="$(mktemp -u /tmp/libio-smoke.renamed.XXXXXX)"
 cleanup() {
-    # io-smoke sub-check J unlinks tmpfile and H/I round-trip
-    # dirpath — best-effort clean here in case anything failed
-    # mid-flight.
-    rm -f "$tmpfile" \
+    # io-smoke sub-check N unlinks renamed_path, H/I round-trip
+    # dirpath, and there may be a stray tmpfile if we failed
+    # before the rename — best-effort clean here.
+    rm -f "$tmpfile" "$renamed_path" \
           io-smoke io-smoke.o \
           fail-smoke fail-smoke.o \
-          c-smoke /tmp/libio-c-smoke.tmp
+          c-smoke /tmp/libio-c-smoke.tmp /tmp/libio-c-smoke.tmp2
     rm -rf "$dirpath"
 }
 trap cleanup EXIT
@@ -68,6 +72,7 @@ fail_total=0
 nasm $nasm_fmt -I../syscall/ \
     -DTMPFILE="\"$tmpfile\"" \
     -DDIRPATH="\"$dirpath\"" \
+    -DRENAMED_PATH="\"$renamed_path\"" \
     io-smoke.asm -o io-smoke.o
 "${ld_cmd[@]}" io-smoke.o "${libs[@]}" -o io-smoke
 

@@ -43,6 +43,26 @@ follows.
 | `mkdir`   | `path`, `mode`                   | `0` or negative errno         |
 | `rmdir`   | `path`                           | `0` or negative errno         |
 
+**v1.2 — path-based stat + atomic rename:**
+
+| Symbol   | Arguments                        | Returns                       |
+| -------- | -------------------------------- | ----------------------------- |
+| `stat`   | `path`, `statbuf*`               | `0` or negative errno         |
+| `rename` | `oldpath`, `newpath`             | `0` or negative errno         |
+
+`stat` is the path-based counterpart to `fstat` — it writes
+the same 144-byte struct, with the same offsets, but resolves
+its target by name instead of by open fd. Follows symbolic
+links along `path`. A caller-side symmetry with `io_size`
+(currently fd-based) is a natural follow-up if a `path`-based
+size helper is ever needed.
+
+`rename` atomically moves a directory entry. Both platforms
+reject cross-filesystem moves with `-EXDEV`. Directory
+semantics: macOS returns `-ENOTEMPTY` when the destination is
+a non-empty directory; Linux allows replacing an empty
+destination directory, `-ENOTEMPTY` otherwise.
+
 `fstat` writes a caller-supplied stat buffer of size
 `STATBUF_SIZE` (144 bytes on both platforms). The struct
 layout differs — macOS uses `struct stat64`, Linux uses
@@ -120,6 +140,7 @@ In the consumer's `.asm`:
 ```nasm
 extern open, openat, lseek, pread, pwrite
 extern fstat, unlink, mkdir, rmdir      ; v1.1
+extern stat, rename                     ; v1.2
 extern io_size                          ; v1.1 (util helper)
 ```
 
@@ -155,24 +176,27 @@ harness in [`test/`](test/):
 - [`io-smoke.asm`](test/io-smoke.asm) — success path. Sub-checks
   `1..C` cover the v1.0 five wrappers on a real mktemp'd file
   (pwrite two halves, lseek `SEEK_END` for size, pread across
-  the seam, openat + pread the tail). Sub-checks `D..K` add
-  v1.1: `fstat` populates a stat buffer whose `st_size` at
-  `ST_SIZE_OFF` reads `10`, `io_size` returns the same size
-  portably, `mkdir` + `rmdir` round-trip a scratch dir,
-  and `unlink` succeeds once then fails with `-ENOENT` the
-  second time.
+  the seam, openat + pread the tail). Sub-checks `D..I` cover
+  v1.1's metadata + namespace ops (fstat/io_size verify size,
+  mkdir/rmdir round-trip a scratch dir). Sub-checks `J..O`
+  cover v1.2: `stat` on the tempfile reads size `10`, `rename`
+  moves it to a fresh path, `stat` confirms the source is gone
+  and the destination inherits the size, then `unlink`
+  succeeds once and fails `-ENOENT` on the repeat.
 - [`fail-smoke.asm`](test/fail-smoke.asm) — failure path. Each
   wrapper is called with args the kernel is guaranteed to
   reject (`/proc/libio/does-not-exist-` → `-ENOENT` for
-  `open`, `openat`, `unlink`, `mkdir`, `rmdir`; `fd=999999` →
-  `-EBADF` for `lseek`, `pread`, `pwrite`, `fstat`). Exercises
-  the macOS `SYSCALL_NORM` `neg rax` line on every export.
+  `open`, `openat`, `unlink`, `mkdir`, `rmdir`, `stat`,
+  `rename`; `fd=999999` → `-EBADF` for `lseek`, `pread`,
+  `pwrite`, `fstat`). Exercises the macOS `SYSCALL_NORM`
+  `neg rax` line on every export.
 - [`c-smoke.c`](test/c-smoke.c) — verifies `libio.a` is linkable
   and callable from a normal C toolchain. Uses GCC `__asm__`
   labels to bind libio calls to their bare names (bypassing
-  Mach-O's underscore convention). v1.1: also exercises the
-  new `fstat`, `io_size`, `unlink`, `mkdir`, `rmdir` symbols
-  end-to-end so a C consumer's link line is proven to work.
+  Mach-O's underscore convention). Exercises v1.1's `fstat`,
+  `io_size`, `unlink`, `mkdir`, `rmdir` and v1.2's `stat`,
+  `rename` end-to-end so a C consumer's link line is proven
+  to work for every export.
 
 On success the runner prints one line per test:
 
@@ -186,19 +210,18 @@ Both platforms are exercised on CI.
 
 ## What is not here — yet
 
-v1.1 closes the biggest v1 gaps (metadata via `fstat`, portable
-size via `io_size`, and the namespace ops `unlink` / `mkdir` /
-`rmdir`). Still deferred:
+v1.2 adds path-based `stat` and atomic `rename`. Still deferred:
 
-- `stat`, `lstat` — path-based stat variants. `fstat` covers
-  most consumer needs once you have an open fd; a path-based
-  variant is a straightforward wrapper if someone needs it.
+- `lstat` — like `stat` but does not follow terminal symlinks.
+  Trivial wrapper on top of the same struct layout; add it
+  when a consumer wants to distinguish symlinks from their
+  targets.
 - Directory iteration (`getdents64` on Linux, `getdirentries`
   on macOS). `struct dirent` layouts vary by platform and the
   syscall shape differs, so a portable helper is a larger
   design task.
-- `rename`, `chmod`, `chown`, `symlink`, `readlink`,
-  `truncate` — no consumer needs them yet.
+- `chmod`, `chown`, `symlink`, `readlink`, `truncate`,
+  `ftruncate` — no consumer needs them yet.
 - `dup`, `dup2`, `pipe` — fd-graph manipulation. Useful for
   process plumbing but out of scope for the file-oriented
   archive.
