@@ -1,11 +1,9 @@
-; time-smoke.asm — v1.0 gettimeofday coverage.
+; time-smoke.asm — v1.0 gettimeofday coverage plus v1.1
+; sleep_ms and getrusage coverage.
 ;
-; Standalone. Calls libtime's gettimeofday twice back-to-back and
-; verifies the returned struct timeval is plausible and
-; monotonic within one process.
+; Standalone. Sub-check ids:
 ;
-; Sub-check ids:
-;
+; v1.0 — gettimeofday plausibility and monotonicity:
 ;   1  gettimeofday(&tv1, NULL) → 0
 ;   2  tv1.tv_sec >= 1_700_000_000   (November 2023 epoch — proves
 ;                                     the wrapper actually filled
@@ -21,6 +19,27 @@
 ;   6  (tv2.tv_sec - tv1.tv_sec) < 10 (guard against the wrapper
 ;                                     accidentally storing an
 ;                                     enormous value)
+;
+; v1.1 — sleep_ms actually sleeps:
+;   7  gettimeofday(&tv3, NULL) → 0
+;   8  sleep_ms(50) → 0
+;   9  gettimeofday(&tv4, NULL) → 0
+;   A  (tv4 - tv3) in microseconds >= 40_000 (allow scheduler
+;                                     slack; if we got back
+;                                     under 40ms the sleep
+;                                     silently no-op'd)
+;   B  (tv4 - tv3) in microseconds < 2_000_000 (upper sanity
+;                                     bound — should be well
+;                                     under 2s even on a
+;                                     loaded runner)
+;
+; v1.1 — getrusage returns a plausible struct:
+;   C  getrusage(RUSAGE_SELF, &ru) → 0
+;   D  ru.ru_utime.tv_sec >= 0 AND ru.ru_utime.tv_usec >= 0
+;      (proves the wrapper wrote a valid timeval — 0 is fine on
+;      a fast process where the accumulated user CPU has been
+;      microseconds so far, but negative would mean the wrapper
+;      scribbled something outside the buffer)
 
 %include "syscall.inc"
 
@@ -34,7 +53,7 @@
 
 default rel
 
-extern gettimeofday
+extern gettimeofday, sleep_ms, getrusage
 
 global _start
 global _main
@@ -51,6 +70,9 @@ fail_len  equ $ - fail_msg
 section .bss
 tv1: resb TIMEVAL_SIZE
 tv2: resb TIMEVAL_SIZE
+tv3: resb TIMEVAL_SIZE
+tv4: resb TIMEVAL_SIZE
+ru:  resb 144                        ; struct rusage — 144 bytes on both platforms
 
 section .text
 
@@ -104,6 +126,68 @@ _main:
     sub rax, [tv1 + TV_SEC_OFF]
     cmp rax, 10
     jg .fail
+
+    ; ---- 7: gettimeofday(&tv3, NULL) → 0 ----
+    mov byte [fail_id], '7'
+    lea rdi, [tv3]
+    xor esi, esi
+    call gettimeofday
+    test rax, rax
+    jnz .fail
+
+    ; ---- 8: sleep_ms(50) → 0 ----
+    mov byte [fail_id], '8'
+    mov edi, 50
+    call sleep_ms
+    test rax, rax
+    jnz .fail
+
+    ; ---- 9: gettimeofday(&tv4, NULL) → 0 ----
+    mov byte [fail_id], '9'
+    lea rdi, [tv4]
+    xor esi, esi
+    call gettimeofday
+    test rax, rax
+    jnz .fail
+
+    ; ---- A/B: (tv4 - tv3) in microseconds within [40_000, 2_000_000] ----
+    ; Compute delta_us = (tv4.sec - tv3.sec) * 1_000_000
+    ;                  + (tv4.usec - tv3.usec)
+    ; using signed 64-bit arithmetic — the subtraction can go
+    ; slightly negative on the usec side if tv3.usec > tv4.usec,
+    ; which is fine because the sec delta absorbs the borrow.
+    mov byte [fail_id], 'A'
+    mov rax, [tv4 + TV_SEC_OFF]
+    sub rax, [tv3 + TV_SEC_OFF]
+    mov rcx, 1000000
+    imul rax, rcx
+    mov edx, [tv4 + TV_USEC_OFF]
+    sub edx, [tv3 + TV_USEC_OFF]
+    movsxd rdx, edx                  ; sign-extend the usec delta
+    add rax, rdx                     ; rax = elapsed microseconds
+    cmp rax, 40000
+    jl .fail
+
+    mov byte [fail_id], 'B'
+    cmp rax, 2000000
+    jge .fail
+
+    ; ---- C: getrusage(RUSAGE_SELF, &ru) → 0 ----
+    mov byte [fail_id], 'C'
+    xor edi, edi                     ; RUSAGE_SELF = 0
+    lea rsi, [ru]
+    call getrusage
+    test rax, rax
+    jnz .fail
+
+    ; ---- D: ru.ru_utime tv_sec >= 0 && tv_usec >= 0 ----
+    mov byte [fail_id], 'D'
+    mov rax, [ru + RU_UTIME_OFF + TV_SEC_OFF]
+    test rax, rax
+    js .fail
+    mov eax, [ru + RU_UTIME_OFF + TV_USEC_OFF]
+    test eax, eax
+    js .fail
 
     ; PASS
     mov rax, SYS_write

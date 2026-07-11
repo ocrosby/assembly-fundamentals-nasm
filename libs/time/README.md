@@ -16,22 +16,63 @@ convention, and no-libc policy every archive under `libs/` follows.
 
 ## Version
 
-**v1.0** — `gettimeofday`. The bare minimum needed to answer "what
-time is it?" from raw assembly, and enough to prove the archive
-scaffolding is correct before v1.1 adds monotonic-time and sleep
-primitives.
+**v1.1** — `gettimeofday` (fixed) plus `sleep_ms` (portable
+millisecond sleep) and `getrusage` (CPU-time accounting). Also
+fixes a latent v1.0 bug where the `gettimeofday` wrapper left
+Darwin's 3rd syscall argument uninitialized (see below).
+
+**v1.0** — `gettimeofday` only. Scaffolding release.
 
 ## Exported symbols
 
 | Symbol           | Arguments                                    | Returns              |
 | ---------------- | -------------------------------------------- | -------------------- |
 | `gettimeofday`   | `tv*` (`struct timeval*`), `tz*` (`void*`)   | 0 or negative errno  |
+| `sleep_ms`       | `ms` (unsigned int)                          | 0 or negative errno  |
+| `getrusage`      | `who` (int), `rusage*` (`struct rusage*`)    | 0 or negative errno  |
 
 `gettimeofday` writes the current wall clock to `*tv` as a
 `struct timeval { time_t tv_sec; suseconds_t tv_usec; }` at
 microsecond precision. `tz` is deprecated on both platforms —
 pass NULL. Passing a non-NULL `tz` either fills obsolete fields
 (macOS) or is silently ignored (Linux); it is not portable.
+
+`sleep_ms` suspends the calling thread for approximately `ms`
+milliseconds via `poll(NULL, 0, ms)` — the well-known portable
+trick that borrows the millisecond timeout of the `poll` syscall
+without needing `nanosleep`. Precision is bounded by the kernel
+scheduler tick.
+
+`getrusage` reports resource usage since process start.
+`who = RUSAGE_SELF (0)` reports the calling process's totals;
+`who = RUSAGE_CHILDREN (-1)` reports the sum over waited-on
+children. Only the first two `struct rusage` fields —
+`ru_utime` and `ru_stime`, each a `struct timeval` — are
+guaranteed to have identical layout across platforms;
+`syscall.inc` exposes `RU_UTIME_OFF = 0` and `RU_STIME_OFF = 16`.
+Later fields differ in width and count between macOS and
+Linux — callers that want them handle the per-platform tail
+themselves.
+
+## Darwin gettimeofday 3-arg fix
+
+v1.0's `gettimeofday` wrapper was a straight 2-arg pass-through.
+That is correct on Linux (`SYS_gettimeofday = 96` really is
+2-arg) but **wrong on macOS**: Darwin's `SYS_gettimeofday = 116`
+takes a third argument, `uint64_t *mach_absolute_time`. When
+`rdx` carries a non-zero value on entry, the kernel writes 8
+bytes through it, corrupting whatever memory was there. v1.0
+shipped this bug because the asm smoke test's bss layout
+absorbed the stray write silently, and the C smoke test
+inadvertently linked to libc's `gettimeofday` on macOS (the C
+declaration lacked the `__asm__("gettimeofday")` label needed
+to bypass Mach-O's `_gettimeofday` name mangling).
+
+v1.1 fixes the wrapper (adds `xor edx, edx` before the syscall
+on macOS) and fixes the C smoke test to actually exercise
+libtime's `gettimeofday` via `__asm__` labels — matching the
+pattern used in `libs/io/test/c-smoke.c` and
+`libs/sock/test/c-smoke.c`.
 
 ## Layout — `struct timeval`
 
@@ -51,39 +92,48 @@ NASM consumers.
 
 ## Not here yet
 
-`libtime` v1.0 exposes exactly one wrapper on purpose. The obvious
-next candidates all have macOS gotchas that need a considered
-approach rather than a straight `SYS_*` mapping:
+The obvious remaining candidates all run into a macOS wall:
 
-- **`clock_gettime`.** Darwin does not expose the POSIX
-  `clock_gettime` as a numbered BSD syscall. The closest kernel
-  interface is `clock_gettime_nsec_np` at syscall 462, which
-  returns nanoseconds directly in `rax` for a `clock_id_t`
-  argument — non-portable and shaped nothing like Linux's
-  `clock_gettime(clock_id, struct timespec*)` at syscall 228.
-  libtime v1.1 will provide `clock_gettime` with a per-platform
-  implementation body that hides the split.
-- **`nanosleep`.** Linux exposes `SYS_nanosleep` at 35 with a
-  clean `(const struct timespec *req, struct timespec *rem)`
-  signature. macOS routes `nanosleep` through
-  `__semwait_signal` (syscall 334), which needs a semaphore fd
-  in addition to the timeout — not something a caller wants to
-  set up. libtime v1.1 will offer a `sleep_ms` helper that
-  wraps `nanosleep` on Linux and a `poll(NULL, 0, ms)` fallback
-  on macOS.
-- **`mach_absolute_time`.** macOS's monotonic clock is a Mach
-  trap, not a BSD syscall — accessible by placing a negative
-  syscall number in `rax`. libtime v1.1 will expose a
-  `monotonic_ns` helper that dispatches to the trap on macOS
-  and `clock_gettime(CLOCK_MONOTONIC, ...)` on Linux.
-- **`time`.** Linux has `SYS_time` at 201; macOS does not — libc's
-  `time()` on Darwin is a wrapper around `gettimeofday`. If
-  every value can already be recovered from `gettimeofday`, a
-  separate wrapper adds no capability, so `time` will not ship.
+- **`clock_gettime`.** No numbered POSIX equivalent on Darwin.
+  The closest interface, `clock_gettime_nsec_np` at syscall 462,
+  is now **blocked from userspace** — invoking it via the raw
+  `syscall` instruction returns `-1` (verified on Darwin 25.3,
+  x86_64). Apple flags the entry with `NO_SYSCALL_STUB` and
+  routes libc's `clock_gettime` through the commpage instead.
+  There is no path to POSIX `clock_gettime` semantics from raw
+  assembly without either:
+  - reading the commpage (version-fragile addresses that
+    change between Darwin releases), or
+  - linking libSystem (breaks the [no-libc
+    policy](../README.md#archives) every archive in `libs/`
+    follows).
 
-Each deferred wrapper is a design task, not a naming task —
-adding it well means picking one signature that hides the
-per-platform mechanism from callers.
+  libtime therefore **defers `clock_gettime` indefinitely on
+  macOS**. Linux callers who need nanosecond precision can call
+  the Linux syscall (`SYS_clock_gettime = 228`) directly; the
+  archive will not paper over the platform gap with an
+  asymmetric wrapper.
+- **`nanosleep`.** Same shape. Linux `SYS_nanosleep = 35` is
+  clean; Darwin has no numbered equivalent, and its
+  `__semwait_signal` (334) needs a semaphore fd rather than a
+  timeout. `sleep_ms` (this release) gives 90% of the value at
+  millisecond precision; nanosecond precision on macOS is
+  gated on the same commpage/libSystem trade-off as
+  `clock_gettime`.
+- **`mach_absolute_time`.** Historically a mach trap
+  (`0x1000003`), but modern Darwin routes the userspace name
+  through the commpage — the trap still fires but returns a
+  value in an unstable, undocumented unit that no longer
+  matches `mach_timebase_info`. Not useful without libSystem.
+- **`time`.** Linux has `SYS_time = 201`; macOS does not. Since
+  `gettimeofday` already exists on both, a separate `time`
+  wrapper adds no capability, so it will not ship.
+
+The precision gap is a real limitation. It is why every wrapper
+here is honest about being **microsecond**- rather than
+**nanosecond**-precise, and why v1.1 stops at three symbols
+rather than papering over the macOS story with a wrapper that
+would silently degrade on one platform.
 
 ## Building
 
@@ -102,12 +152,20 @@ make -C libs/time test
 The test target builds the archive first, then runs the harness
 in [`test/run.sh`](test/run.sh):
 
-- **`time-smoke`** — calls `gettimeofday` twice and checks the
-  returned struct is plausible (post-2023 `tv_sec`, `tv_usec` in
-  range) and non-decreasing between calls.
+- **`time-smoke`** — sub-checks 1–6 verify `gettimeofday`
+  plausibility (post-2023 `tv_sec`, valid `tv_usec`,
+  monotonic between successive calls); 7–B verify
+  `sleep_ms(50)` actually delays for 40–2000 ms; C–D verify
+  `getrusage(RUSAGE_SELF, &ru)` returns a `struct rusage`
+  with non-negative `ru_utime` and `ru_stime`.
 - **`c-smoke`** — links `libtime.a` from a C toolchain and
-  compares its `gettimeofday` return against libc's
-  `time(NULL)`, verifying the two agree within ±60 seconds.
+  exercises every exported symbol with `__asm__` labels
+  pinning the reference to libtime's bare names (bypassing
+  Mach-O's `_gettimeofday` mangling that would otherwise fall
+  back to libc). Cross-checks `gettimeofday` against libc's
+  `time(NULL)` (±60 s), verifies `sleep_ms(50)` elapsed at
+  least 20 ms, and confirms `getrusage` produced non-negative
+  CPU time.
 
 Both must print `PASS` for the target to exit 0.
 

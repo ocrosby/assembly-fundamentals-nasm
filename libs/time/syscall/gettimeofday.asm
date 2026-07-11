@@ -27,6 +27,19 @@ global gettimeofday
 section .text
 
 gettimeofday:
+%ifdef MACOS
+    ; Darwin's SYS_gettimeofday takes THREE arguments, not two:
+    ; (tv, tz, uint64_t *mach_absolute_time). Callers pin the
+    ; POSIX 2-arg signature by convention, so we must zero the
+    ; kernel-side 3rd argument ourselves — otherwise the kernel
+    ; writes 8 bytes through whatever value rdx happens to
+    ; carry, which is usually stack garbage from the caller.
+    ; libtime v1.0 shipped without this, and the wrapper worked
+    ; only because the asm smoke's bss layout absorbed the stray
+    ; write silently. Any real caller with a non-zero rdx would
+    ; have seen memory corruption.
+    xor edx, edx
+%endif
     mov rax, SYS_gettimeofday
     SYSCALL_NORM
     ret
