@@ -4,10 +4,14 @@ ARCHIVE := lib$(NAME).a
 # syscall/ holds the direct kernel-syscall wrappers plus their
 # shared syscall.inc header. inet/ holds the pure-computation
 # helpers from <arpa/inet.h> — byte-order and text↔binary
-# routines that never enter the kernel.
+# routines that never enter the kernel. util/ (v1.1) holds
+# composed helpers that string several syscalls together into a
+# single call — for example server_bind_listen wraps socket +
+# setsockopt + bind + listen.
 SYSCALL_SRCS := $(wildcard syscall/*.asm)
 INET_SRCS    := $(wildcard inet/*.asm)
-SRCS         := $(SYSCALL_SRCS) $(INET_SRCS)
+UTIL_SRCS    := $(wildcard util/*.asm)
+SRCS         := $(SYSCALL_SRCS) $(INET_SRCS) $(UTIL_SRCS)
 OBJS         := $(SRCS:.asm=.o)
 
 UNAME_S := $(shell uname -s)
@@ -36,6 +40,12 @@ syscall/%.o: syscall/%.asm syscall/syscall.inc
 # inet/ helpers are self-contained — no shared header, no syscall.
 inet/%.o: inet/%.asm
 	nasm $(NASM_FLAGS) $< -o $@
+
+# util/ helpers compose syscall wrappers, so they include
+# syscall.inc for the AF_INET / SIN_HEADER / SOL_SOCKET constants
+# and the SYSCALL_* macros.
+util/%.o: util/%.asm syscall/syscall.inc
+	nasm $(NASM_FLAGS) -I syscall/ $< -o $@
 
 # Smoke-test the socket path end to end: build this archive and
 # libasm.a, then run the loopback client/server harness. Requires

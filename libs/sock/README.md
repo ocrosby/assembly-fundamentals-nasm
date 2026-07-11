@@ -82,6 +82,26 @@ emits the RFC 5952 canonical form. Buffer-size requirements are
 exact accepted grammar, rejection cases, and canonical-form
 rules.
 
+### Composed server helpers (v1.1)
+
+| Symbol               | Arguments                                                    | Returns                              |
+| -------------------- | ------------------------------------------------------------ | ------------------------------------ |
+| `server_bind_listen` | `ip_net` (u32 net order), `port_host` (u16), `backlog` (int) | fd or negative errno                 |
+
+`server_bind_listen` composes the four syscalls that every TCP
+server always makes into one call: `socket(AF_INET,
+SOCK_STREAM, 0)` → `setsockopt(SO_REUSEADDR, 1)` →
+`bind(sockaddr_in{ip, port}, 16)` → `listen(backlog)`. The
+returned fd is ready for `accept`; on any failure after
+`socket()` succeeded the fd is closed before the errno is
+returned, so callers cannot leak a descriptor.
+
+Pass `ip_net = 0` for `INADDR_ANY` (bind every interface),
+`0x0100007F` for `127.0.0.1` on little-endian x86_64, or an
+`inet_pton4` output for any other IPv4 literal. Pass
+`port_host = 0` to let the kernel pick an ephemeral port; the
+caller reads it back via `getsockname` on the returned fd.
+
 ## What is not here — DNS
 
 `gethostbyname`, `gethostbyaddr`, `getaddrinfo`, and
@@ -159,9 +179,9 @@ run `make -C ../../libs/sock` first.
 make test                           # requires python3
 ```
 
-`make test` builds `libsock.a` and `libasm.a`, then runs seven
+`make test` builds `libsock.a` and `libasm.a`, then runs eight
 smoke tests in sequence via the harness in [`test/`](test/).
-Together they call every one of the 30 exported symbols on at
+Together they call every one of the 31 exported symbols on at
 least one success path; every syscall wrapper on at least one
 failure path (which is what actually exercises the macOS
 `SYSCALL_NORM` `neg rax` branch — the success paths never do);
@@ -196,6 +216,13 @@ regression case is sub-check `q` in `inet6-smoke`.
   what actually runs the `neg rax` line inside `SYSCALL_NORM`
   on macOS. On Linux the same call verifies each wrapper
   correctly propagates the kernel's negative errno.
+- [`bind-listen-smoke.asm`](test/bind-listen-smoke.asm) — the
+  v1.1 composed helper. Calls `server_bind_listen` with
+  `INADDR_ANY` and `127.0.0.1` in turn, each time verifying
+  the returned fd is non-negative and closes cleanly. Proves
+  the socket + setsockopt + bind + listen composition is a
+  drop-in replacement for the four-syscall server prologue
+  and does not leak the fd on any interior failure.
 - [`tcp-smoke.asm`](test/tcp-smoke.asm) + `server.py` —
   end-to-end TCP client. Python loopback server on an ephemeral
   port; assembly client goes through `socket` / `connect` /
@@ -233,6 +260,7 @@ PASS: inet4-smoke    output=[PASS]
 PASS: inet6-smoke    output=[PASS]
 PASS: ipc-smoke      output=[PASS]
 PASS: fail-smoke     output=[PASS]
+PASS: bind-listen-smoke output=[PASS]
 PASS: tcp-smoke      output=[TCP-OK]
 PASS: server-smoke   output=[PORT:<n>]
 PASS: c-smoke        output=[PASS]
@@ -242,15 +270,21 @@ All three run on both macOS and Linux under CI.
 
 ## Source layout
 
-Wrappers are split into two subdirectories that mirror how the
+Wrappers are split into three subdirectories that mirror how the
 code actually works:
 
 - [`syscall/`](syscall/) — 22 kernel-syscall wrappers plus their
   shared `syscall.inc` header. Every file is a three-to-five
-  instruction shim over a single syscall.
+  instruction shim over a single syscall. As of v1.1 the header
+  also exports shared socket-domain constants (`AF_INET`,
+  `SIN_HEADER`, `SOL_SOCKET`, `SO_REUSEADDR`, `SO_TYPE`,
+  `SO_RCVTIMEO`) so composed helpers do not redefine them.
 - [`inet/`](inet/) — 8 pure-computation helpers from POSIX
   `<arpa/inet.h>` (byte-order + IPv4/IPv6 text conversion). No
   kernel calls, no shared header.
+- [`util/`](util/) — v1.1 composed helpers that string several
+  syscall wrappers together into a single call. Currently one
+  entry: `server_bind_listen`.
 
 Each exported symbol lives in a same-named file (`socket.asm`
 exports `socket`, `htons.asm` exports `htons`, and so on). The
