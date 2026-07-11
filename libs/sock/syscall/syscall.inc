@@ -79,4 +79,56 @@
     mov r10, rcx                    ; 4th arg: SysV rcx → syscall r10
 %endmacro
 
+; -----------------------------------------------------------------
+; v1.1: shared socket-domain constants.
+;
+; The individual syscall wrappers don't need these (they just
+; forward the caller's register values to the kernel), but composed
+; helpers in util/ do — and hardcoding them privately in each
+; helper is how drift creeps in. Every value below matches the
+; platform's <sys/socket.h> / <netinet/in.h> headers.
+;
+; Address families:
+%define AF_INET      2
+%ifdef MACOS
+%define AF_INET6     30
+%else
+%define AF_INET6     10
+%endif
+
+; Socket types are consistent across BSD-derived Unixes:
+%define SOCK_STREAM  1
+%define SOCK_DGRAM   2
+
+; SIN_HEADER is the first two bytes of `struct sockaddr_in` for an
+; AF_INET socket, packed as a little-endian u16 that a `mov word`
+; can drop into the first slot of the struct.
+;
+; On BSD-derived Unixes (macOS included) `struct sockaddr_in`
+; starts with `sin_len` (u8) then `sin_family` (u8); the AF_INET
+; value with sin_len=16 gives 0x0210 when read as a little-endian
+; u16. Linux does not carry the length byte — the family sits at
+; offset 0 as a u16, so SIN_HEADER on Linux is just AF_INET.
+%ifdef MACOS
+%define SIN_HEADER   0x0210
+%else
+%define SIN_HEADER   0x0002
+%endif
+
+; SOL_SOCKET is the option "level" for socket-level options
+; (SO_REUSEADDR, SO_TYPE, SO_RCVTIMEO, …). One of the earliest
+; surprises between the two ABIs: macOS reuses the historical BSD
+; sentinel 0xffff, Linux picked 1.
+%ifdef MACOS
+%define SOL_SOCKET   0xffff
+%define SO_REUSEADDR 0x0004
+%define SO_TYPE      0x1008
+%define SO_RCVTIMEO  0x1006
+%else
+%define SOL_SOCKET   1
+%define SO_REUSEADDR 2
+%define SO_TYPE      3
+%define SO_RCVTIMEO  20
+%endif
+
 %endif ; SOCK_SYSCALL_INC

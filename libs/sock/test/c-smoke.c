@@ -60,6 +60,14 @@ extern char *inet_ntop6(const void *src, char *dst, size_t size)      __asm__("i
 extern int socket(int domain, int type, int protocol) __asm__("socket");
 extern int close(int fd)                              __asm__("close");
 
+/* v1.1 util helper — compose the four syscalls every TCP server
+ * always makes into one call. Return value is either a non-
+ * negative fd or a negative errno. */
+extern long server_bind_listen(unsigned ip_net,
+                                unsigned short port_host,
+                                int backlog)
+    __asm__("server_bind_listen");
+
 static int fail(int id) {
     fprintf(stderr, "FAIL:%d\n", id);
     return 1;
@@ -117,6 +125,19 @@ int main(void) {
     int fd = socket(AF_INET, SOCK_STREAM, 0);
     if (fd < 0)         return fail(16);
     if (close(fd) != 0) return fail(17);
+
+    /* v1.1: server_bind_listen against INADDR_ANY, kernel-picked
+     * port, small backlog. Proves the composed helper links
+     * cleanly and returns a positive fd. */
+    long sfd = server_bind_listen(0u, 0u, 5);
+    if (sfd < 0)                                     return fail(18);
+    if (close((int)sfd) != 0)                        return fail(19);
+
+    /* And once more against 127.0.0.1 to verify the ip_net
+     * argument path (not just the INADDR_ANY zero-fast-path). */
+    long sfd2 = server_bind_listen(0x0100007Fu, 0u, 1);
+    if (sfd2 < 0)                                    return fail(20);
+    if (close((int)sfd2) != 0)                       return fail(21);
 
     puts("PASS");
     return 0;
