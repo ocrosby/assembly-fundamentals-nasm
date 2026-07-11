@@ -9,8 +9,8 @@ of the syscall numbers lives in exactly one place.
 See [`../README.md`](../README.md) for the conventions shared by every
 archive in `libs/` (calling convention, error convention, no-libc
 policy). This archive predates the split into subdirectories — it
-was the seed of `libs/` and moved down one level when `libs/tcp/`
-was added.
+was the seed of `libs/` and moved down one level when
+[`libs/sock/`](../sock/) was added.
 
 ## Exported symbols
 
