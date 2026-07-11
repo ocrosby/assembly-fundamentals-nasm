@@ -8,7 +8,10 @@ SRCS := \
     wire-encode.asm \
     wire-decode.asm \
     random.asm \
-    resolv-a.asm
+    resolv-a.asm \
+    hosts.asm \
+    resolvconf.asm \
+    hostname.asm
 
 OBJS := $(SRCS:.asm=.o)
 
@@ -34,9 +37,9 @@ $(ARCHIVE): $(OBJS)
 	nasm $(NASM_FLAGS) $< -o $@
 
 # Smoke-test the resolver path end to end: build this archive
-# plus libsock (DNS transport), libio (for future v1.1 file
-# reads — currently unused, but keeping the make dependency
-# consistent), and libasm. Then run the harness.
+# plus libsock (DNS transport + close + inet_pton4), libio
+# (open + pread for /etc/hosts and /etc/resolv.conf), and
+# libasm. Then run the harness.
 test: $(ARCHIVE)
 	$(MAKE) -C ../sock
 	$(MAKE) -C ../io

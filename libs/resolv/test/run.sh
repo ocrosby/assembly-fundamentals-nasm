@@ -1,20 +1,20 @@
 #!/usr/bin/env bash
 # run.sh — smoke-test suite for libresolv.a.
 #
-# Runs three tests in sequence:
+# Runs six tests in sequence:
 #
-#   1. resolv-smoke — end-to-end DNS resolution against a Python
-#      mock server (mock-dns.py). The server binds a UDP socket
-#      on an ephemeral port, writes the port to a file, and
-#      responds to three canned names (an A record, an
-#      NXDOMAIN, and a SERVFAIL). The client asserts each maps
-#      to the expected libresolv return code.
-#   2. fail-smoke   — libresolv's own syscall wrapper's failure
-#      branch (resolv_random with NULL buf → -EFAULT). All
-#      other syscalls the resolver makes route through libsock,
-#      whose fail-smoke already covers them.
-#   3. c-smoke      — verify libresolv is linkable and callable
-#      from a C toolchain via __asm__ labels.
+#   1. resolv-smoke     — end-to-end DNS against mock-dns.py
+#      (v1.0 wire encode/decode, resolv_a orchestration)
+#   2. hosts-smoke      — resolv_hosts_lookup against a mktemp'd
+#      /etc/hosts fixture (v1.1)
+#   3. resolvconf-smoke — resolv_conf_read against a mktemp'd
+#      /etc/resolv.conf fixture (v1.1)
+#   4. hostname-smoke   — resolv_hostname_at end-to-end: hosts
+#      hit shortcuts DNS, hosts miss falls to the conf-derived
+#      resolver (v1.1)
+#   5. fail-smoke       — resolv_random failure branch
+#   6. c-smoke          — verify libresolv is linkable and
+#      callable from a C toolchain via __asm__ labels
 #
 # Requires: nasm, ld, cc, python3.
 set -euo pipefail
@@ -33,22 +33,67 @@ case "$(uname -s)" in
         ;;
 esac
 
-# libresolv depends on libsock at link time (socket / sendto /
-# recvfrom / setsockopt / close). List libresolv first so
-# static-archive resolution pulls in its objects to satisfy
-# resolv_a's undefined references before libsock's own objects
-# get considered.
-libs=(../libresolv.a ../../sock/libsock.a)
+# libresolv depends on libsock (socket / sendto / recvfrom /
+# setsockopt / close / inet_pton4) and, from v1.1 onwards, on
+# libio (open / pread) for the /etc/hosts and /etc/resolv.conf
+# parsers. List libresolv first so static-archive resolution
+# pulls its objects in to satisfy each undefined reference
+# before libsock / libio get considered.
+libs=(../libresolv.a ../../sock/libsock.a ../../io/libio.a)
 
 tmp="$(mktemp -d)"
 srv=""
 cleanup() {
     [ -n "$srv" ] && kill "$srv" 2>/dev/null || true
-    rm -rf "$tmp" resolv-smoke resolv-smoke.o fail-smoke fail-smoke.o c-smoke
+    rm -rf "$tmp" \
+        resolv-smoke resolv-smoke.o \
+        hosts-smoke hosts-smoke.o \
+        resolvconf-smoke resolvconf-smoke.o \
+        hostname-smoke hostname-smoke.o \
+        fail-smoke fail-smoke.o c-smoke
 }
 trap cleanup EXIT
 
 fail_total=0
+
+# --- create fixture files inside the sandboxed tmpdir ---
+hosts_fixture="$tmp/hosts"
+cat > "$hosts_fixture" <<'HOSTSEOF'
+# test hosts file for libresolv v1.1
+203.0.113.42 example.test example
+fe80::1 ipv6-only.test
+198.51.100.7 backup.test
+# 192.0.2.1 comment.test
+HOSTSEOF
+
+conf_fixture="$tmp/resolv.conf"
+cat > "$conf_fixture" <<'CONFEOF'
+# test resolv.conf for libresolv v1.1
+# nameserver 198.51.100.53
+domain test
+nameserver 192.0.2.53
+nameserver 203.0.113.53
+CONFEOF
+
+conf_empty_fixture="$tmp/resolv.empty.conf"
+cat > "$conf_empty_fixture" <<'EMPTYEOF'
+# resolv.conf without any nameserver directive
+domain test
+options ndots:2
+EMPTYEOF
+
+hostname_hosts_fixture="$tmp/hostname-hosts"
+cat > "$hostname_hosts_fixture" <<'HNHEOF'
+198.18.0.1 libresolv-hostname-hit.test
+HNHEOF
+
+# The hostname-smoke fixture points at 127.0.0.1 — a port
+# nothing listens on, so the DNS fallback path times out /
+# connection-refuses. That is what sub-check 2 asserts.
+hostname_conf_fixture="$tmp/hostname-conf"
+cat > "$hostname_conf_fixture" <<'HNCEOF'
+nameserver 127.0.0.1
+HNCEOF
 
 # ---------------------------------------------------------------
 # resolv-smoke — needs the mock DNS server on a runtime port.
@@ -87,6 +132,69 @@ else
         printf "FAIL: %-12s exit=%d output=[%s]\n" "resolv-smoke" "$r_code" "$r_out"
         fail_total=$((fail_total + 1))
     fi
+fi
+
+# ---------------------------------------------------------------
+# hosts-smoke — parses the /etc/hosts fixture. Standalone.
+# ---------------------------------------------------------------
+# shellcheck disable=SC2086
+nasm $nasm_fmt -DHOSTS_PATH="\"$hosts_fixture\"" hosts-smoke.asm -o hosts-smoke.o
+"${ld_cmd[@]}" hosts-smoke.o "${libs[@]}" -o hosts-smoke
+
+set +e
+h_out="$(./hosts-smoke 2>&1)"
+h_code=$?
+set -e
+
+if [ "$h_code" -eq 0 ]; then
+    printf "PASS: %-14s output=[%s]\n" "hosts-smoke" "$h_out"
+else
+    printf "FAIL: %-14s exit=%d output=[%s]\n" "hosts-smoke" "$h_code" "$h_out"
+    fail_total=$((fail_total + 1))
+fi
+
+# ---------------------------------------------------------------
+# resolvconf-smoke — parses the /etc/resolv.conf fixture.
+# ---------------------------------------------------------------
+# shellcheck disable=SC2086
+nasm $nasm_fmt \
+    -DCONF_PATH="\"$conf_fixture\"" \
+    -DCONF_EMPTY_PATH="\"$conf_empty_fixture\"" \
+    resolvconf-smoke.asm -o resolvconf-smoke.o
+"${ld_cmd[@]}" resolvconf-smoke.o "${libs[@]}" -o resolvconf-smoke
+
+set +e
+rc_out="$(./resolvconf-smoke 2>&1)"
+rc_code=$?
+set -e
+
+if [ "$rc_code" -eq 0 ]; then
+    printf "PASS: %-14s output=[%s]\n" "resolvconf-smoke" "$rc_out"
+else
+    printf "FAIL: %-14s exit=%d output=[%s]\n" "resolvconf-smoke" "$rc_code" "$rc_out"
+    fail_total=$((fail_total + 1))
+fi
+
+# ---------------------------------------------------------------
+# hostname-smoke — composed hosts-then-DNS entry point.
+# ---------------------------------------------------------------
+# shellcheck disable=SC2086
+nasm $nasm_fmt \
+    -DHOSTS_PATH="\"$hostname_hosts_fixture\"" \
+    -DCONF_PATH="\"$hostname_conf_fixture\"" \
+    hostname-smoke.asm -o hostname-smoke.o
+"${ld_cmd[@]}" hostname-smoke.o "${libs[@]}" -o hostname-smoke
+
+set +e
+hn_out="$(./hostname-smoke 2>&1)"
+hn_code=$?
+set -e
+
+if [ "$hn_code" -eq 0 ]; then
+    printf "PASS: %-14s output=[%s]\n" "hostname-smoke" "$hn_out"
+else
+    printf "FAIL: %-14s exit=%d output=[%s]\n" "hostname-smoke" "$hn_code" "$hn_out"
+    fail_total=$((fail_total + 1))
 fi
 
 # ---------------------------------------------------------------

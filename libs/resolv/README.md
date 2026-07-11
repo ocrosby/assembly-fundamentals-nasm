@@ -18,6 +18,8 @@ follows.
 
 ## Exported symbols
 
+**v1.0 — DNS wire + UDP transport:**
+
 | Symbol                     | Arguments                                                     | Returns                                    |
 | -------------------------- | ------------------------------------------------------------- | ------------------------------------------ |
 | `resolv_a`                 | `name`, `resolver_ip`, `port`, `out_ip*`                      | `0` on success, negative errno on failure  |
@@ -25,11 +27,31 @@ follows.
 | `resolv_decode_response`   | `buf*`, `len`, `expected_id`, `out_ip*`                       | `0` on success, negative errno on failure  |
 | `resolv_random`            | `buf*`, `len`                                                 | non-negative on success, negative errno on failure |
 
-`resolv_a` is the entry point most callers use. The other three
-are exposed so consumers that want to run the wire encode /
-decode step against a non-standard transport (a bespoke TCP DNS
-client, a captured pcap, an in-process fuzzer) can reach the
-building blocks directly.
+**v1.1 — /etc/hosts + /etc/resolv.conf integration:**
+
+| Symbol                     | Arguments                                                              | Returns                                    |
+| -------------------------- | ---------------------------------------------------------------------- | ------------------------------------------ |
+| `resolv_hosts_lookup`      | `path`, `name`, `out_ip*`                                              | `0` on match, `-ENOENT` on miss, `-errno` on file error |
+| `resolv_conf_read`         | `path`, `out_ip*`                                                      | `0` on success, `-ENOENT` if no nameserver, `-errno` on file error |
+| `resolv_hostname_at`       | `hosts_path`, `conf_path`, `name`, `out_ip*`                           | `0` on success, negative errno on failure  |
+| `resolv_hostname`          | `name`, `out_ip*`                                                      | `0` on success, negative errno on failure  |
+
+`resolv_hostname` is the highest-level entry point for
+production consumers — it composes the /etc/hosts lookup, the
+/etc/resolv.conf parse, and `resolv_a` behind a two-argument
+interface identical to `getaddrinfo`'s hostname-to-IPv4 case.
+`resolv_hostname_at` exposes the same composition with
+explicit paths so tests can point at fixtures without
+depending on the real system files.
+
+`resolv_a` remains available for consumers that want to bypass
+the file layer entirely (embedded systems, sandboxed
+processes without filesystem access, or callers that already
+know the resolver IP). The other three v1.0 symbols are
+exposed so consumers that want to run the wire encode /
+decode step against a non-standard transport (a bespoke TCP
+DNS client, a captured pcap, an in-process fuzzer) can reach
+the building blocks directly.
 
 `resolver_ip` is a `u32` IPv4 already in **network byte order**:
 `8.8.8.8` is `0x08080808`, `127.0.0.1` is `0x0100007F` under
@@ -57,17 +79,17 @@ constant in `resolv-a.asm`. Future work (v1.1) exposes it as a
 
 ## What is not here — yet
 
-The v1 scope is deliberately narrow: A records only, one
-resolver, one query, no retries. Callers pass the resolver IP
-directly, which unblocks a follow-up `libresolv` v1.1 that will
-read `/etc/resolv.conf` via `libio` and pick a resolver from
-there. Also deferred:
+v1.1 adds `/etc/resolv.conf` and `/etc/hosts` integration on
+top of v1.0's wire-format primitives. Still deferred:
 
 - AAAA (IPv6) records — same wire pattern, another QTYPE
 - CNAME chasing — follow-the-alias loop with a hop cap
 - Multi-record responses — return more than the first A
 - TCP fallback on the truncated (`TC=1`) response
-- `/etc/hosts` fallback before hitting the network
+- Multiple resolvers with failover — currently only the first
+  `nameserver` in `/etc/resolv.conf` is used
+- Non-standard resolver ports — `resolv_hostname` assumes 53;
+  `resolv_a` still accepts an explicit port for custom setups
 - Search-domain iteration
 - Query retry with backoff across multiple resolvers
 - DNSSEC signature validation — would drag crypto into scope
@@ -152,8 +174,9 @@ run `make -C ../../libs/resolv` first (which itself calls
 make test                           # requires python3
 ```
 
-`make test` builds `libresolv.a`, `libsock.a`, and `libasm.a`,
-then runs three smoke tests via the harness in [`test/`](test/):
+`make test` builds `libresolv.a`, `libsock.a`, `libio.a`, and
+`libasm.a`, then runs six smoke tests via the harness in
+[`test/`](test/):
 
 - [`resolv-smoke.asm`](test/resolv-smoke.asm) + `mock-dns.py` —
   end-to-end DNS. `mock-dns.py` binds a UDP socket on
@@ -170,6 +193,24 @@ then runs three smoke tests via the harness in [`test/`](test/):
   the only fresh syscall the archive contributes; every other
   syscall the resolver makes goes through libsock's already-
   covered wrappers.
+- [`hosts-smoke.asm`](test/hosts-smoke.asm) — exercises
+  `resolv_hosts_lookup` against a `mktemp`'d /etc/hosts
+  fixture. Eight sub-checks: canonical name match, alias
+  match, case-insensitive match, later-entry match,
+  not-in-file miss, commented-out miss, non-IPv4-line skip,
+  non-existent-file error.
+- [`resolvconf-smoke.asm`](test/resolvconf-smoke.asm) —
+  exercises `resolv_conf_read` against a `mktemp`'d
+  /etc/resolv.conf fixture. Three sub-checks: first
+  parseable `nameserver` wins over the commented-out
+  earlier one and the later one, non-existent-file error,
+  no-nameserver-directive miss.
+- [`hostname-smoke.asm`](test/hostname-smoke.asm) —
+  end-to-end test of `resolv_hostname_at`. Verifies the
+  hosts hit shortcuts DNS (no packet ever sent), and that a
+  hosts miss falls through to DNS (which fails because the
+  fixture points at a port nothing listens on — the point is
+  that the fall-through *happens*, not that it succeeds).
 - [`c-smoke.c`](test/c-smoke.c) — verifies `libresolv.a` is
   linkable and callable from a C toolchain via `__asm__`
   labels. Encodes a small query, rejects an obviously-too-
@@ -179,9 +220,12 @@ then runs three smoke tests via the harness in [`test/`](test/):
 On success the runner prints one line per test:
 
 ```text
-PASS: resolv-smoke output=[PASS]
-PASS: fail-smoke   output=[PASS]
-PASS: c-smoke      output=[PASS]
+PASS: resolv-smoke   output=[PASS]
+PASS: hosts-smoke    output=[PASS]
+PASS: resolvconf-smoke output=[PASS]
+PASS: hostname-smoke output=[PASS]
+PASS: fail-smoke     output=[PASS]
+PASS: c-smoke        output=[PASS]
 ```
 
 Both platforms are exercised on CI.
