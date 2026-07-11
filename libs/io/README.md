@@ -105,6 +105,39 @@ follows.
 | `fcntl` | `fd`, `cmd`, `arg`    | command-specific value or negative errno       |
 | `flock` | `fd`, `operation`     | `0` or negative errno                          |
 
+**v1.9 — memory mapping:**
+
+| Symbol   | Arguments                                             | Returns                                        |
+| -------- | ----------------------------------------------------- | ---------------------------------------------- |
+| `mmap`   | `addr*`, `len`, `prot`, `flags`, `fd`, `offset`       | mapped address (positive) or negative errno    |
+| `munmap` | `addr*`, `len`                                        | `0` or negative errno                          |
+
+`mmap` takes six arguments — SYSCALL_ARG4 shifts the 4th
+(`flags`) from SysV `rcx` to syscall `r10`; `r8` and `r9`
+already match the kernel-side slots. `syscall.inc` exports
+`PROT_NONE` / `PROT_READ` / `PROT_WRITE` / `PROT_EXEC` (values
+agree across platforms) and the sharing/behavior flags
+`MAP_SHARED` / `MAP_PRIVATE` / `MAP_FIXED` (values also agree)
+plus the per-platform `MAP_ANON` (Darwin `0x1000`, Linux
+`0x20`, resolved by the header). Callers pass `MAP_ANON`
+uniformly and the right numeric value is baked in at
+assembly time.
+
+Common patterns:
+
+- Anonymous scratch page:
+  `mmap(NULL, 4096, PROT_READ|PROT_WRITE, MAP_ANON|MAP_PRIVATE, -1, 0)`
+- File-backed read-only view:
+  `mmap(NULL, len, PROT_READ, MAP_PRIVATE, fd, 0)`
+- Shared writable view (IPC between processes on the same
+  file): `mmap(NULL, len, PROT_READ|PROT_WRITE, MAP_SHARED, fd, 0)`
+
+`munmap` is a two-argument pass-through. The address and
+length passed in must match a prior `mmap` — the kernel
+tolerates a wider range (unmapping whatever intersects),
+but relying on that is a common way to accidentally free
+someone else's memory.
+
 `fcntl` is a pass-through wrapper — its return value depends on
 the command:
 
@@ -342,6 +375,7 @@ extern symlinkat, linkat, readlinkat            ; v1.5
 extern fchmodat, fchownat                       ; v1.6
 extern dup, dup2, pipe                          ; v1.7
 extern fcntl, flock                             ; v1.8
+extern mmap, munmap                             ; v1.9
 extern io_size                                  ; v1.1 util helper
 extern dir_iter_open, dir_iter_next             ; v1.4 util
 extern dir_iter_close                           ; v1.4 util
@@ -423,6 +457,14 @@ harness in [`test/`](test/):
   `F_SETFD` sets `FD_CLOEXEC` → `F_GETFD` confirms → open a
   scratch tempfile → `flock(LOCK_EX|LOCK_NB)` and
   `flock(LOCK_UN)` succeed → close and unlink.
+- [`mmap-smoke.asm`](test/mmap-smoke.asm) — v1.9's `mmap`
+  and `munmap`. Four sub-checks: anonymous `MAP_PRIVATE` RW
+  page allocation → byte-level round trip through the
+  mapping → `munmap` releases it → non-anonymous mmap with
+  a bogus fd forces `SYSCALL_NORM`'s failure branch
+  (returns negative errno). macOS's raw kernel accepts
+  `length = 0` even though libc rejects it, so the error
+  probe uses a bad fd rather than a zero length.
 - [`c-smoke.c`](test/c-smoke.c) — verifies `libio.a` is linkable
   and callable from a normal C toolchain. Uses GCC `__asm__`
   labels to bind libio calls to their bare names (bypassing
@@ -437,6 +479,7 @@ PASS: io-smoke     output=[PASS]
 PASS: fail-smoke   output=[PASS]
 PASS: fdgraph-smoke output=[PASS]
 PASS: fcntl-smoke  output=[PASS]
+PASS: mmap-smoke   output=[PASS]
 PASS: c-smoke      output=[PASS]
 ```
 
