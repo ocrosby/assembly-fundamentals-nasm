@@ -40,6 +40,12 @@
 ;      a fast process where the accumulated user CPU has been
 ;      microseconds so far, but negative would mean the wrapper
 ;      scribbled something outside the buffer)
+;
+; v1.2 — time_diff_us pure-computation helper:
+;   E  time_diff_us(&tv4, &tv3) >= 40_000  (same 50ms sleep,
+;                                          expressed via the
+;                                          util helper)
+;   F  time_diff_us(&tv3, &tv4) < 0        (reversed args → negative)
 
 %include "syscall.inc"
 
@@ -53,7 +59,7 @@
 
 default rel
 
-extern gettimeofday, sleep_ms, getrusage
+extern gettimeofday, sleep_ms, getrusage, time_diff_us
 
 global _start
 global _main
@@ -188,6 +194,28 @@ _main:
     mov eax, [ru + RU_UTIME_OFF + TV_USEC_OFF]
     test eax, eax
     js .fail
+
+    ; ---- E: time_diff_us(&tv4, &tv3) >= 40_000 ----
+    ; Same 50ms measurement as sub-check A, this time expressed
+    ; via the util helper — proves it computed a plausible
+    ; positive delta.
+    mov byte [fail_id], 'E'
+    lea rdi, [tv4]
+    lea rsi, [tv3]
+    call time_diff_us
+    cmp rax, 40000
+    jl .fail
+
+    ; ---- F: time_diff_us(&tv3, &tv4) < 0 ----
+    ; Reversed args produce a negative delta — a useful
+    ; sentinel for callers that want to detect an obvious
+    ; argument-order mistake.
+    mov byte [fail_id], 'F'
+    lea rdi, [tv3]
+    lea rsi, [tv4]
+    call time_diff_us
+    test rax, rax
+    jns .fail
 
     ; PASS
     mov rax, SYS_write

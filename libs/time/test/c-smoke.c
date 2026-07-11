@@ -61,9 +61,10 @@ extern time_t_local time(time_t_local *tloc);
  * collision with libc prototypes that may have leaked in
  * through indirect includes.
  */
-extern int libtime_gettimeofday(struct timeval_local *tv, void *tz)          __asm__("gettimeofday");
-extern int libtime_sleep_ms    (unsigned int ms)                             __asm__("sleep_ms");
-extern int libtime_getrusage   (int who, struct rusage_scratch *ru)          __asm__("getrusage");
+extern int  libtime_gettimeofday(struct timeval_local *tv, void *tz)                                     __asm__("gettimeofday");
+extern int  libtime_sleep_ms    (unsigned int ms)                                                        __asm__("sleep_ms");
+extern int  libtime_getrusage   (int who, struct rusage_scratch *ru)                                     __asm__("getrusage");
+extern long libtime_time_diff_us(const struct timeval_local *late, const struct timeval_local *early)    __asm__("time_diff_us");
 
 int main(void) {
     struct timeval_local tv;
@@ -120,6 +121,23 @@ int main(void) {
     if (ru.ru_utime.tv_sec < 0 || ru.ru_utime.tv_usec < 0
         || ru.ru_stime.tv_sec < 0 || ru.ru_stime.tv_usec < 0) {
         fprintf(stderr, "getrusage produced negative CPU time\n");
+        return 1;
+    }
+
+    /* v1.2: time_diff_us should match the manually-computed
+     * elapsed_us for the same before/after pair. Also verify
+     * the reversed-args negative sentinel.
+     */
+    long via_helper = libtime_time_diff_us(&after, &before);
+    if (via_helper != elapsed_us) {
+        fprintf(stderr, "time_diff_us disagreed: helper=%ld manual=%ld\n",
+            via_helper, elapsed_us);
+        return 1;
+    }
+    long reversed = libtime_time_diff_us(&before, &after);
+    if (reversed >= 0) {
+        fprintf(stderr, "reversed time_diff_us should be negative, got %ld\n",
+            reversed);
         return 1;
     }
 

@@ -16,20 +16,32 @@ convention, and no-libc policy every archive under `libs/` follows.
 
 ## Version
 
+**v1.2** — first `util/` helper: `time_diff_us(late, early)`,
+a pure computation that returns the signed microsecond
+difference between two `struct timeval`s.
+
 **v1.1** — `gettimeofday` (fixed) plus `sleep_ms` (portable
 millisecond sleep) and `getrusage` (CPU-time accounting). Also
-fixes a latent v1.0 bug where the `gettimeofday` wrapper left
-Darwin's 3rd syscall argument uninitialized (see below).
+fixed the latent v1.0 bug where the `gettimeofday` wrapper
+left Darwin's 3rd syscall argument uninitialized (see below).
 
 **v1.0** — `gettimeofday` only. Scaffolding release.
 
 ## Exported symbols
+
+### `syscall/` — direct kernel wrappers
 
 | Symbol           | Arguments                                    | Returns              |
 | ---------------- | -------------------------------------------- | -------------------- |
 | `gettimeofday`   | `tv*` (`struct timeval*`), `tz*` (`void*`)   | 0 or negative errno  |
 | `sleep_ms`       | `ms` (unsigned int)                          | 0 or negative errno  |
 | `getrusage`      | `who` (int), `rusage*` (`struct rusage*`)    | 0 or negative errno  |
+
+### `util/` — pure-computation helpers
+
+| Symbol           | Arguments                                     | Returns                                                     |
+| ---------------- | --------------------------------------------- | ----------------------------------------------------------- |
+| `time_diff_us`   | `late*`, `early*` (both `struct timeval*`)    | Signed microsecond delta (`late - early`). Negative sentinels reversed args. |
 
 `gettimeofday` writes the current wall clock to `*tv` as a
 `struct timeval { time_t tv_sec; suseconds_t tv_usec; }` at
@@ -53,6 +65,16 @@ guaranteed to have identical layout across platforms;
 Later fields differ in width and count between macOS and
 Linux — callers that want them handle the per-platform tail
 themselves.
+
+`time_diff_us` computes `late - early` in microseconds,
+returning a signed 64-bit result. It is a pure computation:
+no syscall, no allocation, and no assumption beyond the
+`struct timeval` layout shared with `gettimeofday`. Reversed
+arguments produce a negative value — a convenient sanity
+sentinel for benchmark harnesses that want to detect an
+obvious argument-order mistake. Overflow requires the two
+timevals to be more than ~292,471 years apart; callers can
+treat that limit as effectively absent.
 
 ## Darwin gettimeofday 3-arg fix
 
@@ -129,11 +151,12 @@ The obvious remaining candidates all run into a macOS wall:
   `gettimeofday` already exists on both, a separate `time`
   wrapper adds no capability, so it will not ship.
 
-The precision gap is a real limitation. It is why every wrapper
-here is honest about being **microsecond**- rather than
-**nanosecond**-precise, and why v1.1 stops at three symbols
-rather than papering over the macOS story with a wrapper that
-would silently degrade on one platform.
+The precision gap is a real limitation. It is why every
+wrapper here is honest about being **microsecond**- rather
+than **nanosecond**-precise, and why the syscall-side of the
+archive stops at three symbols rather than papering over the
+macOS story with a wrapper that would silently degrade on
+one platform.
 
 ## Building
 
@@ -157,15 +180,18 @@ in [`test/run.sh`](test/run.sh):
   monotonic between successive calls); 7–B verify
   `sleep_ms(50)` actually delays for 40–2000 ms; C–D verify
   `getrusage(RUSAGE_SELF, &ru)` returns a `struct rusage`
-  with non-negative `ru_utime` and `ru_stime`.
+  with non-negative `ru_utime` and `ru_stime`; E–F verify
+  `time_diff_us` matches the manual computation and returns
+  a negative value for reversed arguments.
 - **`c-smoke`** — links `libtime.a` from a C toolchain and
   exercises every exported symbol with `__asm__` labels
   pinning the reference to libtime's bare names (bypassing
   Mach-O's `_gettimeofday` mangling that would otherwise fall
   back to libc). Cross-checks `gettimeofday` against libc's
   `time(NULL)` (±60 s), verifies `sleep_ms(50)` elapsed at
-  least 20 ms, and confirms `getrusage` produced non-negative
-  CPU time.
+  least 20 ms, confirms `getrusage` produced non-negative
+  CPU time, and asserts `time_diff_us` agrees with the
+  manually-computed elapsed microseconds.
 
 Both must print `PASS` for the target to exit 0.
 
