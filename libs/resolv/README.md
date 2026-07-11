@@ -157,6 +157,36 @@ the natural home rather than libsock because libresolv
 already depends on libsock; putting the composed helper the
 other way around would create a circular dependency.
 
+**v1.8 — name-plus-port to connected fd:**
+
+| Symbol         | Arguments                                                       | Returns                                       |
+| -------------- | --------------------------------------------------------------- | --------------------------------------------- |
+| `resolv_dial`  | `name`, `target_port`, `resolver_ip`, `resolver_port`           | non-negative connected fd, or negative errno  |
+
+`resolv_dial` chains v1.7's `resolv_sockaddr` with libsock's
+`socket(AF_INET, SOCK_STREAM, 0)` and `connect` — the "give
+me a live fd for host:port" call. Arguments match
+`resolv_sockaddr` except the caller no longer supplies the
+output buffer; the sockaddr scratch is stack-local.
+
+Return convention:
+
+- Success: `rax >= 0` — the connected fd, owned by the
+  caller. Ready for `read` / `write` (both in libsock) and
+  eventual `close`.
+- Any failure short-circuits and returns the first
+  negative errno seen along the chain. `-ENOENT` from DNS
+  NXDOMAIN, `-ECONNREFUSED` from a rejected connect, etc.
+  If `connect` fails after `socket` succeeded, the wrapper
+  closes the fd before returning so callers never leak
+  descriptors on the sad path.
+
+Placement is again libresolv rather than libsock — same
+"already depends downward" reasoning as `resolv_sockaddr`.
+Consumers now link libresolv + libsock (in that order) and
+get everything from `name → sockaddr` to `name → connected
+fd` behind a single call each.
+
 The retry uses the same query ID that was sent over UDP, so
 the decoder's ID check still holds. If the TCP retry itself
 fails (connect refused, recv EOF before the full body arrives,

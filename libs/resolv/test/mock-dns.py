@@ -44,6 +44,7 @@ TIMEOUT_SECONDS = 30
 MAX_SERVES = 20
 
 OK_NAME = b"libresolv-ok.test"
+LOOPBACK_NAME = b"libresolv-loopback.test"  # v1.8: → 127.0.0.1, dial-testable
 NX_NAME = b"libresolv-nxdomain.test"
 SERVFAIL_NAME = b"libresolv-servfail.test"
 AAAA_NAME = b"libresolv-aaaa.test"
@@ -54,6 +55,11 @@ LOOP_NAME_B = b"libresolv-loop-b.test"
 TRUNC_NAME = b"libresolv-truncated.test"
 
 OK_ADDR = bytes((203, 0, 113, 42))         # TEST-NET-3 (RFC 5737)
+LOOPBACK_ADDR = bytes((127, 0, 0, 1))       # v1.8: resolve to loopback so
+                                            # resolv_dial's smoke can
+                                            # connect() to this same mock
+                                            # (which is listening on TCP
+                                            # for the DNS truncation path).
 MULTI_ADDRS = [
     bytes((203, 0, 113, 1)),
     bytes((203, 0, 113, 2)),
@@ -122,6 +128,8 @@ def build_response(query: bytes, *, over_tcp: bool = False) -> bytes | None:
 def _dispatch_a(qname, query_id, query, qend, *, over_tcp=False):
     if qname == OK_NAME:
         return _answer_a(query_id, query, qend, [OK_ADDR])
+    if qname == LOOPBACK_NAME:
+        return _answer_a(query_id, query, qend, [LOOPBACK_ADDR])
     if qname == NX_NAME:
         return _nxdomain(query_id, query, qend)
     if qname == SERVFAIL_NAME:
