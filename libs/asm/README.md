@@ -80,8 +80,8 @@ the consumer Makefile.
 
 ## See also
 
-- [`../tcp/`](../tcp/) — TCP socket primitives (`tcp_connect`,
-  `tcp_send`, `tcp_recv`, `tcp_close`).
+- [`../sock/`](../sock/) — Berkeley sockets syscall wrappers plus
+  the `<arpa/inet.h>` byte-order and IPv4/IPv6 text helpers.
 - [`../../docs/14-procedures.md`](../../docs/14-procedures.md) — the
   System V AMD64 calling convention these helpers follow.
 - [`../../examples/20-shared-lib/`](../../examples/20-shared-lib/) —
