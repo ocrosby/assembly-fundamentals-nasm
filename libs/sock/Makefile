@@ -1,7 +1,15 @@
 NAME    := sock
 ARCHIVE := lib$(NAME).a
 
-SRCS :=
+# Connection lifecycle.
+SRCS := \
+    socket.asm \
+    bind.asm \
+    listen.asm \
+    accept.asm \
+    connect.asm \
+    shutdown.asm \
+    close.asm
 
 OBJS := $(SRCS:.asm=.o)
 
