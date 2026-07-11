@@ -39,11 +39,21 @@ esac
 libs=(../libio.a)
 
 tmpfile="$(mktemp /tmp/libio-smoke.XXXXXX)"
+# Reserve a distinct scratch DIR path — mktemp -d would create it,
+# but sub-check H needs to CREATE it via mkdir, so we only pick
+# the name here. If a previous run crashed with the dir still on
+# disk, the trap below rm -rf's it.
+dirpath="$(mktemp -d /tmp/libio-smoke.dir.XXXXXX)"
+rmdir "$dirpath"                       # H recreates it
 cleanup() {
+    # io-smoke sub-check J unlinks tmpfile and H/I round-trip
+    # dirpath — best-effort clean here in case anything failed
+    # mid-flight.
     rm -f "$tmpfile" \
           io-smoke io-smoke.o \
           fail-smoke fail-smoke.o \
           c-smoke /tmp/libio-c-smoke.tmp
+    rm -rf "$dirpath"
 }
 trap cleanup EXIT
 
@@ -53,7 +63,12 @@ fail_total=0
 # io-smoke — needs the mktemp'd path via -DTMPFILE.
 # ---------------------------------------------------------------
 # shellcheck disable=SC2086  # nasm_fmt is intentionally word-split
-nasm $nasm_fmt -DTMPFILE="\"$tmpfile\"" io-smoke.asm -o io-smoke.o
+# -I syscall/ so the smoke test can %include the shared header
+# to pick up STATBUF_SIZE / ST_SIZE_OFF for its fstat check.
+nasm $nasm_fmt -I../syscall/ \
+    -DTMPFILE="\"$tmpfile\"" \
+    -DDIRPATH="\"$dirpath\"" \
+    io-smoke.asm -o io-smoke.o
 "${ld_cmd[@]}" io-smoke.o "${libs[@]}" -o io-smoke
 
 set +e

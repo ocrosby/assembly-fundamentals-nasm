@@ -59,12 +59,17 @@ extern long lseek (int fd, long offset, int whence)                        __asm
 extern long pread (int fd, void *buf, unsigned long count, long offset)    __asm__("pread");
 extern long pwrite(int fd, const void *buf, unsigned long count, long offset) __asm__("pwrite");
 
-/* libc symbols — no __asm__ label, so clang emits the default
- * underscored form (_close, _unlink) that libSystem provides.
- * libio does not export these; a consumer that wants a bare
- * close() links libsock, whose close.o defines it. */
+/* v1.1 libio symbols. fstat's second arg is opaque here — a
+ * caller-allocated 144-byte buffer covers both platforms. */
+extern int  fstat (int fd, void *statbuf)                                  __asm__("fstat");
+extern int  unlink(const char *path)                                       __asm__("unlink");
+extern int  mkdir (const char *path, unsigned mode)                        __asm__("mkdir");
+extern int  rmdir (const char *path)                                       __asm__("rmdir");
+extern int  io_size(int fd, long *out)                                     __asm__("io_size");
+
+/* close still lives in libsock, not libio. Fall through to libc's
+ * default so we don't pull libsock in for one syscall. */
 extern int close(int fd);
-extern int unlink(const char *path);
 
 static int fail(int id) {
     fprintf(stderr, "FAIL:%d\n", id);
@@ -104,10 +109,32 @@ int main(void) {
 
     if (close(fd) != 0)                             return fail(12);
 
-    /* Best-effort cleanup — we deliberately do not link libio's
-     * unlink because libio does not export one (yet). Use the
-     * libc unlink so a partial-failure test still cleans up. */
-    unlink(path);
+    /* v1.1: exercise the new symbols. */
+
+    /* 13: io_size on a fresh openat of the same file → 10. */
+    fd = openat(AT_FDCWD, path, O_RDONLY, 0);
+    if (fd < 0)                                     return fail(13);
+    long sz = -1;
+    if (io_size(fd, &sz) != 0 || sz != 10)          return fail(14);
+
+    /* 15: fstat on the same fd — sanity-check that the wrapper
+     * populates SOMETHING nonzero at the file-size offset. The
+     * exact offset differs per platform; io_size (above) is the
+     * canonical portable check. Here we just prove fstat runs. */
+    unsigned char statbuf[144] = {0};
+    if (fstat(fd, statbuf) != 0)                    return fail(15);
+    if (close(fd) != 0)                             return fail(16);
+
+    /* 17-18: mkdir + rmdir round-trip. */
+    const char *dir = "/tmp/libio-c-smoke.dir";
+    rmdir(dir);                                     /* best-effort clean */
+    if (mkdir(dir, 0755) != 0)                      return fail(17);
+    if (rmdir(dir) != 0)                            return fail(18);
+
+    /* 19-20: unlink the tempfile, then confirm a second unlink
+     * returns a negative errno. */
+    if (unlink(path) != 0)                          return fail(19);
+    if (unlink(path) >= 0)                          return fail(20);
 
     puts("PASS");
     return 0;

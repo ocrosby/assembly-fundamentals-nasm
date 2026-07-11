@@ -1,4 +1,4 @@
-; io-smoke.asm — success-path smoke test for libio's five file
+; io-smoke.asm — success-path smoke test for libio's file
 ; syscall wrappers.
 ;
 ; Sequence:
@@ -17,6 +17,19 @@
 ;   B  verify buf[0..5] == "world"
 ;   C  close fd2 via direct syscall
 ;
+; v1.1 additions (fd3 reopen so we can exercise fstat / io_size
+; without teardown-then-setup):
+;   D  openat(AT_FDCWD, TMPFILE, O_RDONLY)          → fd3
+;   E  fstat(fd3, statbuf), st_size at ST_SIZE_OFF  → 10
+;   F  io_size(fd3, &size_out)                      → 0, out=10
+;   G  close fd3 via direct syscall
+;
+; v1.1 namespace ops (independent of the tempfile above):
+;   H  mkdir(DIRPATH, 0755)                         → 0
+;   I  rmdir(DIRPATH)                               → 0
+;   J  unlink(TMPFILE)                              → 0
+;   K  unlink(TMPFILE)  (already gone)              → < 0
+;
 ; TMPFILE is a path the harness generates via mktemp and injects
 ; via `-DTMPFILE="..."`; run.sh removes it after the test.
 ;
@@ -27,6 +40,16 @@
 %ifndef TMPFILE
 %define TMPFILE "/tmp/libio-smoke-default"
 %endif
+%ifndef DIRPATH
+%define DIRPATH "/tmp/libio-smoke-dir-default"
+%endif
+
+; Pull in libio's syscall.inc for STATBUF_SIZE and ST_SIZE_OFF —
+; the smoke test needs the platform-appropriate offset to
+; verify what fstat wrote. Callers of libio in the wild do NOT
+; need this: they can just use util/io-size for size lookups,
+; or add named offsets to syscall.inc for other fields.
+%include "syscall.inc"
 
 ; O_* flag values (POSIX). macOS and Linux happen to agree on
 ; O_RDONLY / O_WRONLY / O_RDWR / O_CREAT / O_TRUNC. O_APPEND
@@ -65,12 +88,15 @@
 default rel
 
 extern open, openat, lseek, pread, pwrite
+extern fstat, unlink, mkdir, rmdir
+extern io_size
 
 global _start
 global _main
 
 section .rodata
 tmpfile:  db TMPFILE, 0
+dirpath:  db DIRPATH, 0
 hello:    db "hello"
 world:    db "world"
 exp_low:  db "lowo"
@@ -88,6 +114,8 @@ fail_len  equ $ - fail_msg
 
 section .bss
 buf:      resb 32
+statbuf:  resb STATBUF_SIZE                ; 144 on both platforms
+size_out: resq 1                            ; scratch for io_size
 
 section .text
 
@@ -213,6 +241,81 @@ _main:
 %endif
     test rax, rax
     jnz .fail
+
+    ; ---- D: reopen for fstat / io_size (fd3) ----
+    mov byte [fail_id], 'D'
+    mov edi, AT_FDCWD
+    lea rsi, [tmpfile]
+    mov edx, O_RDONLY
+    xor ecx, ecx
+    call openat
+    test rax, rax
+    js .fail
+    mov rbx, rax                     ; fd3
+
+    ; ---- E: fstat(fd3, statbuf), st_size at ST_SIZE_OFF == 10 ----
+    mov byte [fail_id], 'E'
+    mov rdi, rbx
+    lea rsi, [statbuf]
+    call fstat
+    test rax, rax
+    jnz .fail
+    mov rax, [statbuf + ST_SIZE_OFF]
+    cmp rax, 10
+    jne .fail
+
+    ; ---- F: io_size(fd3, &size_out); size_out == 10 ----
+    mov byte [fail_id], 'F'
+    mov rdi, rbx
+    lea rsi, [size_out]
+    call io_size
+    test rax, rax
+    jnz .fail
+    mov rax, [size_out]
+    cmp rax, 10
+    jne .fail
+
+    ; ---- G: close(fd3) ----
+    mov byte [fail_id], 'G'
+    mov rdi, rbx
+    mov rax, SYS_close
+    syscall
+%ifdef MACOS
+    jnc .close3_ok
+    neg rax
+.close3_ok:
+%endif
+    test rax, rax
+    jnz .fail
+
+    ; ---- H: mkdir(DIRPATH, 0755) → 0 ----
+    mov byte [fail_id], 'H'
+    lea rdi, [dirpath]
+    mov esi, 0755q                   ; rwx-r-x-r-x
+    call mkdir
+    test rax, rax
+    jnz .fail
+
+    ; ---- I: rmdir(DIRPATH) → 0 ----
+    mov byte [fail_id], 'I'
+    lea rdi, [dirpath]
+    call rmdir
+    test rax, rax
+    jnz .fail
+
+    ; ---- J: unlink(TMPFILE) → 0 ----
+    mov byte [fail_id], 'J'
+    lea rdi, [tmpfile]
+    call unlink
+    test rax, rax
+    jnz .fail
+
+    ; ---- K: unlink(TMPFILE) again → < 0 (already gone) ----
+    mov byte [fail_id], 'K'
+    lea rdi, [tmpfile]
+    call unlink
+    test rax, rax
+    jns .fail                        ; want negative
 
     ; PASS
     mov rax, SYS_write
