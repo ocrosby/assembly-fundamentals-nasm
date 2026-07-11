@@ -34,7 +34,7 @@
 
 default rel
 
-extern resolv_a, resolv_sockaddr
+extern resolv_a, resolv_sockaddr, resolv_dial, close
 
 global _start
 global _main
@@ -44,6 +44,7 @@ name_ok:       db "libresolv-ok.test", 0
 name_nx:       db "libresolv-nxdomain.test", 0
 name_sf:       db "libresolv-servfail.test", 0
 name_empty:    db 0                  ; empty string (single NUL)
+name_loopback: db "libresolv-loopback.test", 0    ; v1.8: mock answers 127.0.0.1
 expected_ip:   db 203, 0, 113, 42    ; wire-order bytes for OK_NAME
 %ifdef MACOS
 expected_hdr:  dw 0x0210             ; sin_len=16, sin_family=AF_INET
@@ -158,6 +159,39 @@ _main:
     mov ecx, DNS_PORT
     lea r8, [sockaddr_out]
     call resolv_sockaddr
+    cmp rax, -2
+    jne .fail
+
+    ; ---- v1.8: resolv_dial end-to-end ----------------------
+    ; C: resolv_dial("libresolv-loopback.test", DNS_PORT, 127.0.0.1, DNS_PORT)
+    ;    → non-negative connected fd. The mock DNS resolves the
+    ;      loopback name to 127.0.0.1 and the mock's TCP
+    ;      listener (up for the TC=1 fallback path) accepts the
+    ;      connect on DNS_PORT.
+    mov byte [fail_id], 'C'
+    lea rdi, [name_loopback]
+    mov esi, DNS_PORT
+    mov edx, 0x0100007F
+    mov ecx, DNS_PORT
+    call resolv_dial
+    test rax, rax
+    js .fail
+    mov r12d, eax                    ; save fd for cleanup
+
+    ; D: close the connected fd → 0
+    mov byte [fail_id], 'D'
+    mov edi, r12d
+    call close
+    test rax, rax
+    jnz .fail
+
+    ; E: resolv_dial with an NXDOMAIN name propagates -ENOENT
+    mov byte [fail_id], 'E'
+    lea rdi, [name_nx]
+    mov esi, DNS_PORT
+    mov edx, 0x0100007F
+    mov ecx, DNS_PORT
+    call resolv_dial
     cmp rax, -2
     jne .fail
 

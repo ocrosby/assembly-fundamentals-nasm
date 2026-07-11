@@ -17,7 +17,8 @@ SRCS := \
     resolvconf.asm \
     resolvconf-search.asm \
     hostname.asm \
-    resolv-sockaddr.asm
+    resolv-sockaddr.asm \
+    resolv-dial.asm
 
 OBJS := $(SRCS:.asm=.o)
 
