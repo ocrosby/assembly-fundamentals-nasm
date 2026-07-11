@@ -83,6 +83,32 @@ follows.
 | `linkat`     | `olddirfd`, `oldpath`, `newdirfd`, `newpath`, `flags`        | `0` or negative errno                |
 | `readlinkat` | `dirfd`, `path`, `buf*`, `bufsize`                           | bytes copied or negative errno       |
 
+**v1.6 — permission and ownership `*at()` variants:**
+
+| Symbol     | Arguments                                                    | Returns                              |
+| ---------- | ------------------------------------------------------------ | ------------------------------------ |
+| `fchmodat` | `dirfd`, `path`, `mode`, `flags`                             | `0` or negative errno                |
+| `fchownat` | `dirfd`, `path`, `uid`, `gid`, `flags`                       | `0` or negative errno                |
+
+`fchmodat` and `fchownat` are the dirfd-scoped counterparts to
+`chmod` (v1.3) and `chown` (v1.3). Same semantics — the mode
+bits go through the umask, the `-1` sentinel for uid/gid means
+"leave that ID as-is", `AT_SYMLINK_NOFOLLOW` in the `flags`
+slot targets the link itself when the terminal path component
+is a symlink. Non-root callers can smoke-test the wrappers
+with `fchownat(dirfd, path, -1, -1, 0)` which is a portable
+no-op.
+
+`utimensat` is deliberately NOT wrapped. macOS does not expose
+a numbered `utimensat` syscall — its libc implements it in
+userspace on top of `setattrlistat` + a bespoke `struct
+attrlist`. That is fundamentally a different shape than a thin
+syscall wrapper. Callers that need timestamp control on macOS
+should reach for `SYS_utimes` / `SYS_futimes` (BSD syscalls
+138 / 139) directly for now; if a real consumer materializes,
+libio will grow a portable `touch(path)` helper that dispatches
+appropriately per platform.
+
 The `*at()` family resolves the *path* argument relative to
 *dirfd* — a file descriptor pointing at a directory obtained
 via `open` or `openat`. The special sentinel `AT_FDCWD` (`-2`
@@ -255,6 +281,7 @@ extern truncate, ftruncate                      ; v1.3
 extern getdents                                 ; v1.4
 extern unlinkat, mkdirat, renameat, fstatat     ; v1.5
 extern symlinkat, linkat, readlinkat            ; v1.5
+extern fchmodat, fchownat                       ; v1.6
 extern io_size                                  ; v1.1 util helper
 extern dir_iter_open, dir_iter_next             ; v1.4 util
 extern dir_iter_close                           ; v1.4 util
@@ -305,15 +332,18 @@ harness in [`test/`](test/):
   through it — mkdirat/unlinkat(AT_REMOVEDIR) round-trip,
   openat + renameat, fstatat + symlinkat + readlinkat,
   linkat, and unlinkat cleanup of each entry, ending in a
-  close of the dirfd.
+  close of the dirfd. `t..y` cover v1.6: reopen AT_DIR, create
+  a scratch file "f", `fchmodat` and `fchownat(-1,-1)` succeed,
+  unlinkat the file, close the dirfd.
 - [`fail-smoke.asm`](test/fail-smoke.asm) — failure path. Each
   wrapper is called with args the kernel is guaranteed to
   reject (`/proc/libio/does-not-exist-` → `-ENOENT` for
   `open`, `openat`, `unlink`, `mkdir`, `rmdir`, `stat`,
   `rename`, `lstat`, `chmod`, `chown`, `symlink`, `readlink`,
   `truncate`; `fd=999999` → `-EBADF` for `lseek`, `pread`,
-  `pwrite`, `fstat`, `ftruncate`, `getdents`, and each of
-  the seven v1.5 `*at()` wrappers when their dirfd is bad).
+  `pwrite`, `fstat`, `ftruncate`, `getdents`, each of the
+  seven v1.5 `*at()` wrappers, and each of the two v1.6
+  `*at()` wrappers when their dirfd is bad).
   Exercises the macOS `SYSCALL_NORM` `neg rax` line on
   every export.
 - [`c-smoke.c`](test/c-smoke.c) — verifies `libio.a` is linkable
@@ -335,14 +365,13 @@ Both platforms are exercised on CI.
 
 ## What is not here — yet
 
-v1.5 covers the `*at()` family — `openat` (v1.0), plus v1.5's
-`unlinkat` / `mkdirat` / `renameat` / `fstatat` / `symlinkat`
-/ `linkat` / `readlinkat`. A hard-link `link()` wrapper is
-covered by `linkat(AT_FDCWD, …)`. Still deferred:
+v1.6 covers the `*at()` permission / owner variants (`fchmodat`,
+`fchownat`) on top of v1.5's `*at()` core. Still deferred:
 
-- `fchmodat`, `fchownat`, `futimesat`, `utimensat` — dirfd-
-  scoped mode/owner/timestamp mutators. Cheap wrappers once
-  a consumer needs them.
+- `utimensat` — see the v1.6 symbol section for the reason.
+  Would require a per-platform helper on macOS (dispatching
+  to `setattrlistat` with an `attrlist` struct); on Linux it
+  is just `SYS_utimensat`. Add if a real consumer needs it.
 - `access`, `faccessat` — permission checks. Skipped for now
   since `open` + errno is more informative.
 - `dup`, `dup2`, `pipe` — fd-graph manipulation. Useful for

@@ -79,6 +79,17 @@
 ;   r  unlinkat(dirfd, "h", 0)                      → 0
 ;   s  close(dirfd)                                 → 0
 ;
+; v1.6 permission/owner *at() variants. Reopen AT_DIR from run.sh
+; (still on disk after sub-check s closed the dirfd but before
+; the trap removes it) and chain through fchmodat + fchownat:
+;   t  open(AT_DIR, O_RDONLY, 0)                    → dirfd2
+;   u  openat(dirfd2, "f",
+;             O_CREAT|O_RDWR, 0644)                 → close
+;   v  fchmodat(dirfd2, "f", 0600, 0)               → 0
+;   w  fchownat(dirfd2, "f", -1, -1, 0)             → 0
+;   x  unlinkat(dirfd2, "f", 0)                     → 0
+;   y  close(dirfd2)                                → 0
+;
 ; TMPFILE is a path the harness generates via mktemp and injects
 ; via `-DTMPFILE="..."`; run.sh removes it after the test.
 ;
@@ -159,6 +170,7 @@ extern fstat, unlink, mkdir, rmdir
 extern stat, rename
 extern lstat, chmod, chown, symlink, readlink, truncate, ftruncate
 extern unlinkat, mkdirat, renameat, fstatat, symlinkat, linkat, readlinkat
+extern fchmodat, fchownat
 extern io_size
 extern dir_iter_open, dir_iter_next, dir_iter_close
 
@@ -750,6 +762,79 @@ _main:
     jnc .close_at_dir_ok
     neg rax
 .close_at_dir_ok:
+%endif
+    test rax, rax
+    jnz .fail
+
+    ; ---- t: reopen AT_DIR → dirfd2 (also held in r15) ----
+    mov byte [fail_id], 't'
+    lea rdi, [at_dir]
+    mov esi, O_RDONLY
+    xor edx, edx
+    call open
+    test rax, rax
+    js .fail
+    mov r15, rax
+
+    ; ---- u: openat(dirfd2, "f", O_CREAT|O_RDWR, 0644); close ----
+    mov byte [fail_id], 'u'
+    mov rdi, r15
+    lea rsi, [at_f]
+    mov edx, O_CREAT | O_RDWR
+    mov ecx, 0644q
+    call openat
+    test rax, rax
+    js .fail
+    mov rdi, rax
+    mov rax, SYS_close
+    syscall
+%ifdef MACOS
+    jnc .close_at_u_ok
+    neg rax
+.close_at_u_ok:
+%endif
+    test rax, rax
+    jnz .fail
+
+    ; ---- v: fchmodat(dirfd2, "f", 0600, 0) → 0 ----
+    mov byte [fail_id], 'v'
+    mov rdi, r15
+    lea rsi, [at_f]
+    mov edx, 0600q
+    xor ecx, ecx
+    call fchmodat
+    test rax, rax
+    jnz .fail
+
+    ; ---- w: fchownat(dirfd2, "f", -1, -1, 0) → 0 (no-op) ----
+    mov byte [fail_id], 'w'
+    mov rdi, r15
+    lea rsi, [at_f]
+    mov edx, -1
+    mov ecx, -1
+    xor r8d, r8d
+    call fchownat
+    test rax, rax
+    jnz .fail
+
+    ; ---- x: unlinkat(dirfd2, "f", 0) → 0 ----
+    mov byte [fail_id], 'x'
+    mov rdi, r15
+    lea rsi, [at_f]
+    xor edx, edx
+    call unlinkat
+    test rax, rax
+    jnz .fail
+
+    ; ---- y: close(dirfd2) ----
+    mov byte [fail_id], 'y'
+    mov rdi, r15
+    mov rax, SYS_close
+    syscall
+%ifdef MACOS
+    jnc .close_at_dir2_ok
+    neg rax
+.close_at_dir2_ok:
 %endif
     test rax, rax
     jnz .fail

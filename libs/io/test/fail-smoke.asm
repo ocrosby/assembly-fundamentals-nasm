@@ -35,6 +35,8 @@
 ;   N symlinkat   — dirfd=999999 → -EBADF        (v1.5)
 ;   O linkat      — both dirfds bad → -EBADF     (v1.5)
 ;   P readlinkat  — dirfd=999999 → -EBADF        (v1.5)
+;   Q fchmodat    — dirfd=999999 → -EBADF        (v1.6)
+;   R fchownat    — dirfd=999999 → -EBADF        (v1.6)
 ;
 ; Prints "PASS\n" and exits 0 when every wrapper returned a
 ; negative value from its intentionally-broken call. Prints
@@ -66,6 +68,7 @@ extern stat, rename
 extern lstat, chmod, chown, symlink, readlink, truncate, ftruncate
 extern getdents
 extern unlinkat, mkdirat, renameat, fstatat, symlinkat, linkat, readlinkat
+extern fchmodat, fchownat
 
 global _start
 global _main
@@ -287,6 +290,23 @@ _main:
     mov ecx, 32
     call readlinkat
     EXPECT_NEGATIVE 'P'
+
+    ; Q: fchmodat(BAD_FD, bad_path, 0644, 0) -> -EBADF
+    mov edi, BAD_FD
+    lea rsi, [bad_path]
+    mov edx, 0644q
+    xor ecx, ecx
+    call fchmodat
+    EXPECT_NEGATIVE 'Q'
+
+    ; R: fchownat(BAD_FD, bad_path, -1, -1, 0) -> -EBADF
+    mov edi, BAD_FD
+    lea rsi, [bad_path]
+    mov edx, -1
+    mov ecx, -1
+    xor r8d, r8d
+    call fchownat
+    EXPECT_NEGATIVE 'R'
 
     ; PASS
     mov rax, SYS_write
