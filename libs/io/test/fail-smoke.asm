@@ -20,6 +20,13 @@
 ;   8 rmdir       — bad path  → -ENOENT         (v1.1)
 ;   9 stat        — bad path  → -ENOENT         (v1.2)
 ;   A rename      — both bad  → -ENOENT         (v1.2)
+;   B lstat       — bad path  → -ENOENT         (v1.3)
+;   C chmod       — bad path  → -ENOENT         (v1.3)
+;   D chown       — bad path  → -ENOENT         (v1.3)
+;   E symlink     — dest in missing dir         (v1.3)
+;   F readlink    — bad path  → -ENOENT         (v1.3)
+;   G truncate    — bad path  → -ENOENT         (v1.3)
+;   H ftruncate   — fd=999999 → -EBADF          (v1.3)
 ;
 ; Prints "PASS\n" and exits 0 when every wrapper returned a
 ; negative value from its intentionally-broken call. Prints
@@ -48,6 +55,7 @@ default rel
 extern open, openat, lseek, pread, pwrite
 extern fstat, unlink, mkdir, rmdir
 extern stat, rename
+extern lstat, chmod, chown, symlink, readlink, truncate, ftruncate
 
 global _start
 global _main
@@ -157,6 +165,52 @@ _main:
     lea rsi, [bad_path2]
     call rename
     EXPECT_NEGATIVE 'A'
+
+    ; B: lstat(bad_path, buf) -> -ENOENT
+    lea rdi, [bad_path]
+    lea rsi, [buf]
+    call lstat
+    EXPECT_NEGATIVE 'B'
+
+    ; C: chmod(bad_path, 0644) -> -ENOENT
+    lea rdi, [bad_path]
+    mov esi, 0644q
+    call chmod
+    EXPECT_NEGATIVE 'C'
+
+    ; D: chown(bad_path, -1, -1) -> -ENOENT
+    lea rdi, [bad_path]
+    mov esi, -1
+    mov edx, -1
+    call chown
+    EXPECT_NEGATIVE 'D'
+
+    ; E: symlink(bad_path, bad_path2) -> -ENOENT
+    ; symlink accepts arbitrary target strings, but linkpath's
+    ; parent must exist — /proc/libio/ does not.
+    lea rdi, [bad_path]
+    lea rsi, [bad_path2]
+    call symlink
+    EXPECT_NEGATIVE 'E'
+
+    ; F: readlink(bad_path, buf, 32) -> -ENOENT
+    lea rdi, [bad_path]
+    lea rsi, [buf]
+    mov edx, 32
+    call readlink
+    EXPECT_NEGATIVE 'F'
+
+    ; G: truncate(bad_path, 0) -> -ENOENT
+    lea rdi, [bad_path]
+    xor esi, esi
+    call truncate
+    EXPECT_NEGATIVE 'G'
+
+    ; H: ftruncate(BAD_FD, 0) -> -EBADF
+    mov edi, BAD_FD
+    xor esi, esi
+    call ftruncate
+    EXPECT_NEGATIVE 'H'
 
     ; PASS
     mov rax, SYS_write

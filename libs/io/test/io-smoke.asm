@@ -37,6 +37,24 @@
 ;   N  unlink(RENAMED_PATH)                         → 0
 ;   O  unlink(RENAMED_PATH) (already gone)          → < 0
 ;
+; v1.3 truncation, permission, symlink chain (chained through
+; TMPFILE_V13 → SYMLINK_PATH; both cleaned up at the end):
+;   P  open(TMPFILE_V13, O_RDWR|O_CREAT|O_TRUNC,
+;          0644)                                    → fd
+;   Q  pwrite(fd, "abcdefghij", 10, 0)              → 10
+;   R  ftruncate(fd, 5)                             → 0
+;   S  io_size(fd, &size_out); size_out            == 5
+;   T  close(fd)
+;   U  truncate(TMPFILE_V13, 3)                     → 0
+;   V  stat(TMPFILE_V13, statbuf); st_size         == 3
+;   W  chmod(TMPFILE_V13, 0644)                     → 0
+;   X  chown(TMPFILE_V13, -1, -1) (leave-as-is)     → 0
+;   Y  symlink(TMPFILE_V13, SYMLINK_PATH)           → 0
+;   Z  readlink(SYMLINK_PATH, linkbuf, 128)         → > 0
+;   a  lstat(SYMLINK_PATH, statbuf)                 → 0
+;   b  unlink(SYMLINK_PATH)                         → 0
+;   c  unlink(TMPFILE_V13)                          → 0
+;
 ; TMPFILE is a path the harness generates via mktemp and injects
 ; via `-DTMPFILE="..."`; run.sh removes it after the test.
 ;
@@ -53,6 +71,12 @@
 %ifndef RENAMED_PATH
 %define RENAMED_PATH "/tmp/libio-smoke-renamed-default"
 %endif
+%ifndef TMPFILE_V13
+%define TMPFILE_V13 "/tmp/libio-smoke-v13-default"
+%endif
+%ifndef SYMLINK_PATH
+%define SYMLINK_PATH "/tmp/libio-smoke-symlink-default"
+%endif
 
 ; Pull in libio's syscall.inc for STATBUF_SIZE and ST_SIZE_OFF —
 ; the smoke test needs the platform-appropriate offset to
@@ -68,9 +92,12 @@
 %define O_RDONLY 0
 %define O_RDWR   2
 %define O_CREAT  0x40           ; Linux value
+%define O_TRUNC  0x200          ; Linux value
 %ifdef MACOS
 %undef  O_CREAT
+%undef  O_TRUNC
 %define O_CREAT  0x200          ; Darwin value
+%define O_TRUNC  0x400          ; Darwin value
 %endif
 
 %define SEEK_SET 0
@@ -100,6 +127,7 @@ default rel
 extern open, openat, lseek, pread, pwrite
 extern fstat, unlink, mkdir, rmdir
 extern stat, rename
+extern lstat, chmod, chown, symlink, readlink, truncate, ftruncate
 extern io_size
 
 global _start
@@ -109,8 +137,11 @@ section .rodata
 tmpfile:      db TMPFILE, 0
 dirpath:      db DIRPATH, 0
 renamed_path: db RENAMED_PATH, 0
+tmpfile_v13:  db TMPFILE_V13, 0
+symlink_path: db SYMLINK_PATH, 0
 hello:        db "hello"
 world:        db "world"
+tenbytes:     db "abcdefghij"
 exp_low:      db "lowo"
 
 pass_msg: db "PASS", 10
@@ -128,6 +159,7 @@ section .bss
 buf:      resb 32
 statbuf:  resb STATBUF_SIZE                ; 144 on both platforms
 size_out: resq 1                            ; scratch for io_size
+linkbuf:  resb 128                          ; scratch for readlink
 
 section .text
 
@@ -366,6 +398,138 @@ _main:
     call unlink
     test rax, rax
     jns .fail
+
+    ; ---- P: open(TMPFILE_V13, O_RDWR|O_CREAT|O_TRUNC, 0644) ----
+    mov byte [fail_id], 'P'
+    lea rdi, [tmpfile_v13]
+    mov esi, O_RDWR | O_CREAT | O_TRUNC
+    mov edx, 0644q
+    call open
+    test rax, rax
+    js .fail
+    mov rbx, rax                     ; fd
+
+    ; ---- Q: pwrite(fd, "abcdefghij", 10, 0) → 10 ----
+    mov byte [fail_id], 'Q'
+    mov rdi, rbx
+    lea rsi, [tenbytes]
+    mov edx, 10
+    xor ecx, ecx
+    call pwrite
+    cmp rax, 10
+    jne .fail
+
+    ; ---- R: ftruncate(fd, 5) → 0 ----
+    mov byte [fail_id], 'R'
+    mov rdi, rbx
+    mov esi, 5
+    call ftruncate
+    test rax, rax
+    jnz .fail
+
+    ; ---- S: io_size(fd, &size_out); size_out == 5 ----
+    mov byte [fail_id], 'S'
+    mov rdi, rbx
+    lea rsi, [size_out]
+    call io_size
+    test rax, rax
+    jnz .fail
+    mov rax, [size_out]
+    cmp rax, 5
+    jne .fail
+
+    ; ---- T: close(fd) via raw syscall ----
+    mov byte [fail_id], 'T'
+    mov rdi, rbx
+    mov rax, SYS_close
+    syscall
+%ifdef MACOS
+    jnc .close_v13_ok
+    neg rax
+.close_v13_ok:
+%endif
+    test rax, rax
+    jnz .fail
+
+    ; ---- U: truncate(TMPFILE_V13, 3) → 0 ----
+    mov byte [fail_id], 'U'
+    lea rdi, [tmpfile_v13]
+    mov esi, 3
+    call truncate
+    test rax, rax
+    jnz .fail
+
+    ; ---- V: stat(TMPFILE_V13, statbuf); st_size == 3 ----
+    mov byte [fail_id], 'V'
+    lea rdi, [tmpfile_v13]
+    lea rsi, [statbuf]
+    call stat
+    test rax, rax
+    jnz .fail
+    mov rax, [statbuf + ST_SIZE_OFF]
+    cmp rax, 3
+    jne .fail
+
+    ; ---- W: chmod(TMPFILE_V13, 0644) → 0 ----
+    mov byte [fail_id], 'W'
+    lea rdi, [tmpfile_v13]
+    mov esi, 0644q
+    call chmod
+    test rax, rax
+    jnz .fail
+
+    ; ---- X: chown(TMPFILE_V13, -1, -1) → 0 (no-op) ----
+    ; -1 for uid/gid means "keep as-is"; safe for a non-root
+    ; smoke test.
+    mov byte [fail_id], 'X'
+    lea rdi, [tmpfile_v13]
+    mov esi, -1
+    mov edx, -1
+    call chown
+    test rax, rax
+    jnz .fail
+
+    ; ---- Y: symlink(TMPFILE_V13, SYMLINK_PATH) → 0 ----
+    mov byte [fail_id], 'Y'
+    lea rdi, [tmpfile_v13]
+    lea rsi, [symlink_path]
+    call symlink
+    test rax, rax
+    jnz .fail
+
+    ; ---- Z: readlink(SYMLINK_PATH, linkbuf, 128) > 0 ----
+    mov byte [fail_id], 'Z'
+    lea rdi, [symlink_path]
+    lea rsi, [linkbuf]
+    mov edx, 128
+    call readlink
+    test rax, rax
+    jle .fail                        ; want strictly positive
+
+    ; ---- a: lstat(SYMLINK_PATH, statbuf) → 0 ----
+    ; Prove the wrapper runs without following the symlink;
+    ; content of statbuf is not asserted (mode-field offset
+    ; differs by platform and is not exposed by syscall.inc).
+    mov byte [fail_id], 'a'
+    lea rdi, [symlink_path]
+    lea rsi, [statbuf]
+    call lstat
+    test rax, rax
+    jnz .fail
+
+    ; ---- b: unlink(SYMLINK_PATH) → 0 (link cleanup) ----
+    mov byte [fail_id], 'b'
+    lea rdi, [symlink_path]
+    call unlink
+    test rax, rax
+    jnz .fail
+
+    ; ---- c: unlink(TMPFILE_V13) → 0 (target cleanup) ----
+    mov byte [fail_id], 'c'
+    lea rdi, [tmpfile_v13]
+    call unlink
+    test rax, rax
+    jnz .fail
 
     ; PASS
     mov rax, SYS_write

@@ -49,6 +49,16 @@
 ; v1.2 additions.
 %define SYS_stat   0x2000152
 %define SYS_rename 0x2000080
+; v1.3 additions.
+; SYS_lstat is Darwin's 64-bit-inode lstat64 (BSD 340), matching
+; the fstat64 (339) and stat64 (338) numbers used by v1.1 / v1.2.
+%define SYS_lstat     0x2000154
+%define SYS_chmod     0x200000f
+%define SYS_chown     0x2000010
+%define SYS_symlink   0x2000039
+%define SYS_readlink  0x200003a
+%define SYS_truncate  0x20000c8
+%define SYS_ftruncate 0x20000c9
 %else
 %define SYS_open   2
 %define SYS_lseek  8
@@ -65,6 +75,14 @@
 ; v1.2 additions.
 %define SYS_stat   4
 %define SYS_rename 82
+; v1.3 additions.
+%define SYS_lstat     6
+%define SYS_chmod     90
+%define SYS_chown     92
+%define SYS_symlink   88
+%define SYS_readlink  89
+%define SYS_truncate  76
+%define SYS_ftruncate 77
 %endif
 
 ; The stat struct is 144 bytes on both macOS (`struct stat64`)
