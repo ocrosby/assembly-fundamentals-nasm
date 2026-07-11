@@ -8,7 +8,11 @@ it to a caller-supplied resolver over UDP via
 [`libsock`](../sock/), waits for the response with a bounded
 timeout, and parses the answer section into either a single
 address (A or AAAA), a packed list of addresses, or a CNAME
-target (chased transparently up to eight hops).
+target (chased transparently up to eight hops). The
+[`libio`](../io/) archive is used for the `/etc/hosts` and
+`/etc/resolv.conf` layer that the hostname-level entry points
+sit on top of; both IPv4 and IPv6 variants share the parser
+via a family flag.
 
 Every routine is a direct syscall (through `libsock`) or pure
 computation — no libc, no libSystem call, no allocation. Same
@@ -60,6 +64,27 @@ the values the decoder supports (`1` for A, `28` for AAAA) and
 `max_count` to bound the copies. The wrappers above are thin
 argument shuffles on top.
 
+**v1.3 — IPv6-aware hosts + hostname entry points:**
+
+| Symbol                     | Arguments                                                              | Returns                                    |
+| -------------------------- | ---------------------------------------------------------------------- | ------------------------------------------ |
+| `resolv_hosts_lookup6`     | `path`, `name`, `out_ip16*`                                            | `0` on match, `-ENOENT` on miss, `-errno` on file error |
+| `resolv_hostname_at6`      | `hosts_path`, `conf_path`, `name`, `out_ip16*`                         | `0` on success, negative errno on failure  |
+| `resolv_hostname6`         | `name`, `out_ip16*`                                                    | `0` on success, negative errno on failure  |
+
+The v6 trio mirrors the v1.1 v4 trio. `resolv_hosts_lookup6`
+parses the hosts file with `inet_pton6`, silently skipping
+IPv4-only lines; the corresponding v4 entry silently skips
+IPv6 lines. The two lookups share the parser via a single-byte
+family flag spilled to the stack — bug fixes to the line
+walker apply to both families without duplication.
+
+`resolv_hostname_at6` / `resolv_hostname6` compose the v6
+hosts lookup with the same `/etc/resolv.conf` reader used by
+the v4 layer, then delegate to `resolv_aaaa`. The resolver
+itself is still an IPv4 address; DNS-over-IPv6 transport is a
+separate concern deferred past v1.3.
+
 `resolv_hostname` is the highest-level entry point for
 production consumers — it composes the /etc/hosts lookup, the
 /etc/resolv.conf parse, and `resolv_a` behind a two-argument
@@ -104,20 +129,21 @@ constant in `resolv-a.asm`. Future work (v1.1) exposes it as a
 
 ## What is not here — yet
 
-v1.2 covers AAAA lookups, CNAME chasing, and multi-record
-answers on top of v1.0's wire-format primitives and v1.1's
-file integration. Still deferred:
+v1.3 adds IPv6-aware hosts and hostname entry points on top of
+v1.0's wire primitives, v1.1's file integration, and v1.2's
+AAAA / CNAME support. Still deferred:
 
 - TCP fallback on the truncated (`TC=1`) response
 - Multiple resolvers with failover — currently only the first
   `nameserver` in `/etc/resolv.conf` is used
-- Non-standard resolver ports — `resolv_hostname` assumes 53;
-  `resolv_a` still accepts an explicit port for custom setups
+- Non-standard resolver ports — the `resolv_hostname*` layer
+  assumes 53; `resolv_a` / `resolv_aaaa` still accept an
+  explicit port for custom setups
+- DNS-over-IPv6 transport — the resolver IP itself is still a
+  32-bit IPv4 address, even for AAAA queries
 - Search-domain iteration
 - Query retry with backoff across multiple resolvers
 - DNSSEC signature validation — would drag crypto into scope
-- `resolv_hostname` still returns only IPv4 — the AAAA-aware
-  counterpart (`resolv_hostname6` / a family argument) is v1.3
 
 Each of these is a real user story worth writing, but each is
 also a chapter of NASM in its own right. Adding them speculatively
@@ -226,11 +252,13 @@ make test                           # requires python3
   syscall the resolver makes goes through libsock's already-
   covered wrappers.
 - [`hosts-smoke.asm`](test/hosts-smoke.asm) — exercises
-  `resolv_hosts_lookup` against a `mktemp`'d /etc/hosts
-  fixture. Eight sub-checks: canonical name match, alias
-  match, case-insensitive match, later-entry match,
-  not-in-file miss, commented-out miss, non-IPv4-line skip,
-  non-existent-file error.
+  `resolv_hosts_lookup` and `resolv_hosts_lookup6` against a
+  `mktemp`'d /etc/hosts fixture. Ten sub-checks: canonical
+  name match, alias match, case-insensitive match, later-entry
+  match, not-in-file miss, commented-out miss, non-IPv4-line
+  skip (v4 lookup), non-existent-file error, v6 canonical
+  match (`fe80::1`), and cross-family miss (v6 lookup of a
+  v4-only name → `-ENOENT`).
 - [`resolvconf-smoke.asm`](test/resolvconf-smoke.asm) —
   exercises `resolv_conf_read` against a `mktemp`'d
   /etc/resolv.conf fixture. Three sub-checks: first
@@ -238,16 +266,22 @@ make test                           # requires python3
   earlier one and the later one, non-existent-file error,
   no-nameserver-directive miss.
 - [`hostname-smoke.asm`](test/hostname-smoke.asm) —
-  end-to-end test of `resolv_hostname_at`. Verifies the
-  hosts hit shortcuts DNS (no packet ever sent), and that a
-  hosts miss falls through to DNS (which fails because the
-  fixture points at a port nothing listens on — the point is
-  that the fall-through *happens*, not that it succeeds).
+  end-to-end test of `resolv_hostname_at` and
+  `resolv_hostname_at6`. Four sub-checks: v4 hosts hit
+  shortcuts DNS (no packet ever sent), v4 hosts miss falls
+  through to DNS (which fails because the fixture points at a
+  port nothing listens on — the point is that the fall-through
+  *happens*), and the same two paths for the v6 pair. The
+  fall-through error code is not asserted; the AAAA path just
+  needs to end negative.
 - [`c-smoke.c`](test/c-smoke.c) — verifies `libresolv.a` is
   linkable and callable from a C toolchain via `__asm__`
-  labels. Encodes a small query, rejects an obviously-too-
-  short buffer, and pulls two random bytes — all without
-  touching the network.
+  labels. Encodes a small query (both `QTYPE=A` and
+  `QTYPE=AAAA`), rejects an obviously-too-short response,
+  pulls a few random bytes, and reaches the v1.3 v6 hosts /
+  hostname entry points with malformed paths to prove they
+  respect the shared `-errno` convention. Nothing here
+  touches the network.
 
 On success the runner prints one line per test:
 

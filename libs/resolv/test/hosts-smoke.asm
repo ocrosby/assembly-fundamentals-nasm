@@ -10,8 +10,14 @@
 ;   4 second-entry match: "backup.test" → 198.51.100.7
 ;   5 miss: "not-in-file.test" → -ENOENT
 ;   6 comment respected: "comment.test" (in a "# …" line) → miss
-;   7 non-IPv4 line skipped: "ipv6-only.test" → miss
+;   7 non-IPv4 line skipped: "ipv6-only.test" via v4 lookup → miss
 ;   8 non-existent file → -ENOENT (from open)
+;   9 v6 canonical match: resolv_hosts_lookup6("ipv6-only.test") → fe80::1
+;  10 v6 lookup of v4-only name: "example.test" via v6 → -ENOENT
+;
+; The fail ID stamped into "FAIL:?" is a single character —
+; sub-checks past 9 use letters ('a' for 10) so the buffer
+; length stays fixed at 6 bytes.
 ;
 ; The fixture file created by run.sh has this content:
 ;
@@ -35,7 +41,7 @@
 
 default rel
 
-extern resolv_hosts_lookup
+extern resolv_hosts_lookup, resolv_hosts_lookup6
 
 global _start
 global _main
@@ -55,6 +61,9 @@ n_ipv6:      db "ipv6-only.test", 0
 exp_ok:      db 203, 0, 113, 42
 exp_backup:  db 198, 51, 100, 7
 
+; fe80::1 as 16 network-order bytes.
+exp_v6:      db 0xfe, 0x80, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1
+
 pass_msg: db "PASS", 10
 pass_len: equ $ - pass_msg
 
@@ -65,6 +74,7 @@ fail_len  equ $ - fail_msg
 
 section .bss
 ip_buf:   resb 4
+ip6_buf:  resb 16
 
 section .text
 
@@ -154,6 +164,31 @@ _main:
     test rax, rax
     jns .fail
 
+    ; 9: v6 canonical match: "ipv6-only.test" → fe80::1
+    mov byte [fail_id], '9'
+    lea rdi, [hosts_path]
+    lea rsi, [n_ipv6]
+    lea rdx, [ip6_buf]
+    call resolv_hosts_lookup6
+    test rax, rax
+    jnz .fail
+    ; Compare 16 bytes against exp_v6.
+    lea rdi, [ip6_buf]
+    lea rsi, [exp_v6]
+    mov ecx, 16
+    call memeq
+    test rax, rax
+    jz .fail
+
+    ; 10: v6 lookup of a v4-only name skips the v4 line and misses.
+    mov byte [fail_id], 'a'
+    lea rdi, [hosts_path]
+    lea rsi, [n_ok]                 ; "example.test" is a v4 line
+    lea rdx, [ip6_buf]
+    call resolv_hosts_lookup6
+    cmp rax, -2
+    jne .fail
+
     ; PASS
     mov rax, SYS_write
     mov edi, 1
@@ -173,3 +208,21 @@ _main:
     mov rax, SYS_exit
     mov edi, 1
     syscall
+
+; memeq(rdi=a, rsi=b, ecx=len) → rax = 1 if equal else 0
+memeq:
+    xor edx, edx
+.mem_loop:
+    cmp edx, ecx
+    jge .mem_eq
+    mov al, [rdi + rdx]
+    cmp al, [rsi + rdx]
+    jne .mem_ne
+    inc edx
+    jmp .mem_loop
+.mem_eq:
+    mov eax, 1
+    ret
+.mem_ne:
+    xor eax, eax
+    ret

@@ -86,6 +86,7 @@ EMPTYEOF
 hostname_hosts_fixture="$tmp/hostname-hosts"
 cat > "$hostname_hosts_fixture" <<'HNHEOF'
 198.18.0.1 libresolv-hostname-hit.test
+2001:db8::1 libresolv-hostname-v6.test
 HNHEOF
 
 # The hostname-smoke fixture points at 127.0.0.1 — a port
@@ -267,8 +268,13 @@ if [ "$(uname -s)" = "Darwin" ]; then
     c_link_flag="-Wl,-w"
 fi
 
+# libresolv v1.3's C smoke references the /etc/hosts-backed
+# entry points, which pull in libio (open/pread). Order the
+# archives resolv → sock → io so undefined refs cascade.
 # shellcheck disable=SC2086
-cc $c_arch_flag $c_link_flag c-smoke.c ../libresolv.a ../../sock/libsock.a -o c-smoke 2>/dev/null
+cc $c_arch_flag $c_link_flag c-smoke.c \
+    ../libresolv.a ../../sock/libsock.a ../../io/libio.a \
+    -o c-smoke 2>/dev/null
 
 set +e
 c_out="$(./c-smoke 2>&1)"
