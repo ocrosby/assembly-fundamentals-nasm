@@ -25,12 +25,16 @@
 %define SYS_getpid  0x2000014
 %define SYS_kill    0x2000025
 %define SYS_getppid 0x2000027
+%define SYS_execve  0x200003b
+%define SYS_exit    0x2000001
 %else
 %define SYS_fork    57
 %define SYS_wait4   61
 %define SYS_getpid  39
 %define SYS_kill    62
 %define SYS_getppid 110
+%define SYS_execve  59
+%define SYS_exit    60
 %endif
 
 ; wait4 `options` flags — bitwise-OR'd. WNOHANG returns 0

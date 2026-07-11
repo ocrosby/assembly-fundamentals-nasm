@@ -1,10 +1,12 @@
-; proc-smoke.asm — v1.0 fork / wait4 / getpid / getppid / kill.
+; proc-smoke.asm — v1.0 fork / wait4 / getpid / getppid / kill
+; plus v1.1 execve + spawn_wait coverage.
 ;
 ; Standalone. Prints "PASS\n" and exits 0 when every sub-check
 ; passes; prints "FAIL:<id>\n" to stderr and exits 1 otherwise.
 ;
 ; Sub-check ids:
 ;
+; v1.0:
 ;   1  getpid()  > 0                     (any real process has pid > 0)
 ;   2  getppid() > 0                     (a smoke test is never pid 1)
 ;   3  getppid() != getpid()             (parent-of-self is impossible)
@@ -14,22 +16,25 @@
 ;   7  parent: wait4(child_pid, ...)     returns child_pid
 ;   8  parent: wstatus == 42 << 8        (WIFEXITED and WEXITSTATUS=42)
 ;   9  parent: kill(child_pid, 0) → -ESRCH (child already reaped)
+;
+; v1.1 — spawn_wait /bin/true:
+;   A  spawn_wait("/bin/true", argv, envp) → wstatus == 0
+;      (proves fork + execve + wait4 wire together and the
+;       target ran cleanly)
 
 %include "syscall.inc"
 
 %ifdef MACOS
 %define SYS_write 0x2000004
-%define SYS_exit  0x2000001
 %define ESRCH     -3            ; canonical -3 on both platforms
 %else
 %define SYS_write 1
-%define SYS_exit  60
 %define ESRCH     -3
 %endif
 
 default rel
 
-extern fork, wait4, getpid, getppid, kill
+extern fork, wait4, getpid, getppid, kill, spawn_wait
 
 global _start
 global _main
@@ -37,6 +42,15 @@ global _main
 section .rodata
 pass_msg: db "PASS", 10
 pass_len: equ $ - pass_msg
+
+; Argv + envp for spawn_wait("/bin/true"). NASM cannot compute
+; the address of a following label inside a `dq` at assembly
+; time unless labels are declared before use — that is fine
+; because true_path already exists here, and both empty_envp
+; and true_argv are read-only.
+true_path: db "/usr/bin/true", 0
+true_argv: dq true_path, 0
+empty_envp: dq 0
 
 section .data
 fail_msg: db "FAIL:?", 10
@@ -112,6 +126,19 @@ _main:
     call kill
     cmp rax, ESRCH
     jne .fail
+
+    ; ---- A: spawn_wait("/usr/bin/true", argv, envp) → wstatus == 0 ----
+    ; Proves the fork + execve + wait4 composition wired
+    ; through the util helper. /usr/bin/true exists on both
+    ; macOS (bare /bin has no `true`) and modern Linux (where
+    ; /bin symlinks to /usr/bin under usrmerge).
+    mov byte [fail_id], 'A'
+    lea rdi, [true_path]
+    lea rsi, [true_argv]
+    lea rdx, [empty_envp]
+    call spawn_wait
+    test rax, rax
+    jnz .fail                        ; wstatus 0 = clean exit(0)
 
     ; PASS
     mov rax, SYS_write
