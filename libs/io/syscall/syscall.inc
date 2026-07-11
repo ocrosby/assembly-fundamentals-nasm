@@ -75,6 +75,13 @@
 %define SYS_symlinkat  0x20001da
 %define SYS_linkat     0x20001d7
 %define SYS_readlinkat 0x20001d9
+; v1.6 additions — permission / owner *at() variants. Note that
+; utimensat is deliberately NOT wrapped: macOS does not expose it
+; as a numbered syscall; its libc implements it via
+; setattrlistat + an attrlist struct, which does not fit the
+; "thin wrapper" contract every other libio symbol satisfies.
+%define SYS_fchmodat   0x20001d3
+%define SYS_fchownat   0x20001d4
 %else
 %define SYS_open   2
 %define SYS_lseek  8
@@ -112,6 +119,11 @@
 %define SYS_symlinkat  266
 %define SYS_linkat     265
 %define SYS_readlinkat 267
+; v1.6 additions. utimensat (280) exists on Linux but macOS has
+; no matching numbered syscall (see the macOS block above), so
+; the symbol is deferred rather than wrapped asymmetrically.
+%define SYS_fchmodat   268
+%define SYS_fchownat   260
 %endif
 
 ; The stat struct is 144 bytes on both macOS (`struct stat64`)

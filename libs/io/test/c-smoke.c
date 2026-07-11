@@ -102,6 +102,14 @@ extern int  linkat    (int olddirfd, const char *oldpath,
                         int newdirfd, const char *newpath, int flags)                            __asm__("linkat");
 extern long readlinkat(int dirfd, const char *path, void *buf, unsigned long bufsize)            __asm__("readlinkat");
 
+/* v1.6: permission/owner *at() variants. utimensat is deliberately
+ * absent — macOS has no numbered syscall for it (libc implements
+ * it via setattrlistat, which does not fit libio's thin-wrapper
+ * contract). */
+extern int  fchmodat  (int dirfd, const char *path, unsigned mode, int flags)                    __asm__("fchmodat");
+extern int  fchownat  (int dirfd, const char *path,
+                        unsigned uid, unsigned gid, int flags)                                   __asm__("fchownat");
+
 /* close still lives in libsock, not libio. Fall through to libc's
  * default so we don't pull libsock in for one syscall. */
 extern int close(int fd);
@@ -285,7 +293,20 @@ int main(void) {
     if (unlinkat(dfd, "g",  0) != 0)                return fail(59);
     if (unlinkat(dfd, "ln", 0) != 0)                return fail(60);
     if (unlinkat(dfd, "h",  0) != 0)                return fail(61);
-    if (close(dfd) != 0)                            return fail(62);
+
+    /* v1.6: chain a fresh "z" file through fchmodat + fchownat
+     * before closing the dirfd we already have. */
+    {
+        int f = openat(dfd, "z", O_RDWR | O_CREAT, 0644);
+        if (f < 0)                                  return fail(62);
+        close(f);
+    }
+    if (fchmodat(dfd, "z", 0600, 0) != 0)           return fail(63);
+    if (fchownat(dfd, "z", (unsigned)-1,
+                                 (unsigned)-1, 0) != 0) return fail(64);
+    if (unlinkat(dfd, "z", 0) != 0)                 return fail(65);
+
+    if (close(dfd) != 0)                            return fail(66);
     rmdir(atd);
 
     puts("PASS");
