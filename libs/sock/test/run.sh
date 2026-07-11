@@ -1,17 +1,17 @@
 #!/usr/bin/env bash
-# run.sh — end-to-end smoke test for libtcp.a.
+# run.sh — end-to-end smoke test for libsock.a's TCP client path.
 #
 # Starts the loopback server, waits for it to publish its port,
-# assembles and links tcp-smoke.asm against libtcp.a + libasm.a for
+# assembles and links tcp-smoke.asm against libsock.a + libasm.a for
 # the host platform, runs it, and asserts the reply. Prints PASS and
 # exits 0 on success; prints a FAIL diagnostic and exits 1 otherwise.
 #
-# Requires: nasm, ld (binutils), python3. Assumes ../libtcp.a and
+# Requires: nasm, ld (binutils), python3. Assumes ../libsock.a and
 # ../../asm/libasm.a already exist (the Makefile `test` target builds
 # them first).
 set -euo pipefail
 
-cd "$(dirname "$0")"                 # libs/tcp/test
+cd "$(dirname "$0")"                 # libs/sock/test
 
 tmp="$(mktemp -d)"
 portfile="$tmp/port"
@@ -58,7 +58,7 @@ fi
 # --- assemble, link, run the client ---
 # shellcheck disable=SC2086  # nasm_fmt is intentionally word-split
 nasm $nasm_fmt -DPORT="$port" tcp-smoke.asm -o tcp-smoke.o
-"${ld_cmd[@]}" tcp-smoke.o ../libtcp.a ../../asm/libasm.a -o tcp-smoke
+"${ld_cmd[@]}" tcp-smoke.o ../libsock.a ../../asm/libasm.a -o tcp-smoke
 
 set +e
 out="$(./tcp-smoke)"

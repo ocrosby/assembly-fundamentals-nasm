@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Loopback TCP server for the libtcp.a smoke test.
+"""Loopback TCP server for the libsock.a smoke test.
 
 Binds 127.0.0.1 on a kernel-assigned ephemeral port, publishes that
 port atomically to the file named by argv[1], accepts one connection,

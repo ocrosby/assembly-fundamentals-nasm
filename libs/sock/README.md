@@ -153,6 +153,28 @@ $(BIN): $(OBJ) $(LIBSOCK)
 Building the consumer does not automatically build the archive;
 run `make -C ../../libs/sock` first.
 
+## Test
+
+```bash
+make test                           # requires python3
+```
+
+`make test` builds `libsock.a` and `libasm.a`, then runs the
+harness in [`test/`](test/): it starts a loopback server on
+`127.0.0.1` (an ephemeral kernel-assigned port), assembles and
+links the client [`test/tcp-smoke.asm`](test/tcp-smoke.asm)
+against both archives, and checks that a `socket` / `connect` /
+`write` / `read` / `close` round trip returns the server's
+banner. On success it prints:
+
+```text
+PASS: tcp smoke — received: TCP-OK
+```
+
+The server is loopback-only, single-connection, and
+timeout-bounded, so the test never reaches the network and
+cannot hang. It runs on both macOS and Linux under CI.
+
 ## Source layout
 
 Wrappers are split into two subdirectories that mirror how the

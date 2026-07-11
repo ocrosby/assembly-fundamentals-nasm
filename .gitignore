@@ -9,7 +9,7 @@
 *.dSYM/
 
 # Built smoke-test client (the object file is covered by *.o above)
-libs/tcp/test/tcp-smoke
+libs/sock/test/tcp-smoke
 
 # Built example binaries. Ignore everything inside a numbered example
 # directory, then un-ignore the source files we actually want tracked.

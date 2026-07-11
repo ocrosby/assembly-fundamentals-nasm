@@ -119,6 +119,6 @@ jobs:
           done
           exit "$fail"
 
-      - name: Build and smoke-test the TCP library
+      - name: Build and smoke-test the sockets library
         shell: bash
-        run: make -C libs/tcp test
+        run: make -C libs/sock test
