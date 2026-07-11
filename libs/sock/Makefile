@@ -42,10 +42,12 @@ SRCS += \
     ntohs.asm \
     ntohl.asm
 
-# IPv4 text↔binary.
+# IPv4 / IPv6 text↔binary.
 SRCS += \
     inet-pton4.asm \
-    inet-ntop4.asm
+    inet-ntop4.asm \
+    inet-pton6.asm \
+    inet-ntop6.asm
 
 OBJS := $(SRCS:.asm=.o)
 
