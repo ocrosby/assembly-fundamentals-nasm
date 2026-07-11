@@ -74,27 +74,14 @@ and the no-libc policy.
 | `inet_pton6`   | `src` (NUL-terminated), `dst*` (16 bytes)     | `1` on success, `0` on parse failure       |
 | `inet_ntop6`   | `src*` (16 bytes net order), `dst*`, `dst_size` | `dst` on success, `NULL` if `size < 46`  |
 
-`inet_pton4` is strict: it rejects leading zeros ("01.2.3.4"),
-out-of-range octets ("1.2.3.256"), missing octets ("1.2.3"), and
-trailing garbage ("1.2.3.4.5"). This matches POSIX `inet_pton()`
-for `AF_INET` and diverges deliberately from the older
-`inet_aton()`, which treats a leading `0` as octal.
-
-`inet_pton6` supports the full RFC 4291 grammar: 1–8 hex groups
-of 1–4 digits, mixed case, `::` compression (at most once,
-expanding to at least one zero group), leading `::` and trailing
-`::`, and the IPv4-mapped tail form `::ffff:192.0.2.1`. It
-rejects the bare-IPv4 form (`1.2.3.4` with no `::` prefix),
-scope IDs (`%eth0`), a single leading colon that is not part of
-`::`, a trailing colon, and any group longer than four hex
-digits.
-
-`inet_ntop6` emits RFC 5952 canonical form: lowercase hex, no
-leading zeros within a group, longest run of two or more zero
-groups compressed to `::` (first run wins on tie), and
-IPv4-mapped addresses printed as `::ffff:a.b.c.d`. The
-destination buffer must be at least `INET6_ADDRSTRLEN` (46
-bytes: `ffff:ffff:ffff:ffff:ffff:ffff:255.255.255.255` plus NUL).
+Parsers are strict: `inet_pton4` follows POSIX `inet_pton()`
+`AF_INET` rules (no leading zeros, no octal fallback);
+`inet_pton6` implements the full RFC 4291 grammar; `inet_ntop6`
+emits the RFC 5952 canonical form. Buffer-size requirements are
+`INET_ADDRSTRLEN` (16) for `inet_ntop4` and `INET6_ADDRSTRLEN`
+(46) for `inet_ntop6`. See [`inet/README.md`](inet/) for the
+exact accepted grammar, rejection cases, and canonical-form
+rules.
 
 ## What is not here — DNS
 
@@ -112,19 +99,16 @@ addresses (via `inet_pton4` / `inet_ntop4` for IPv4 or
 Every routine follows the System V AMD64 ABI: arguments in `rdi`,
 `rsi`, `rdx`, `rcx`, `r8`, `r9`; return value in `rax`.
 Callee-saved registers (`rbx`, `rbp`, `r12`–`r15`) are preserved.
+The return contract is uniform on both platforms — non-negative
+on success, negative errno on failure.
 
-Two subtleties the syscall wrappers handle for you:
-
-- **4th-argument shuffle.** The kernel's syscall ABI expects the
-  4th argument in `r10`, not `rcx` (the syscall instruction
-  clobbers `rcx`). Wrappers with four or more arguments — `send`,
-  `recv`, `sendto`, `recvfrom`, `getsockopt`, `setsockopt`,
-  `select`, `socketpair` — translate this internally.
-- **macOS carry-flag normalization.** BSD syscalls report failure
-  by setting the carry flag and returning a positive errno; Linux
-  returns a negative errno directly in `rax`. Every wrapper
-  normalizes to Linux's convention so callers see one shape on
-  both platforms.
+Two ABI subtleties are absorbed inside the wrappers: the System V
+4th argument (`rcx`) has to be moved into the syscall ABI slot
+(`r10`), and macOS's carry-flag error convention has to be
+normalized to Linux's `-errno` shape. See
+[`syscall/README.md`](syscall/) for the two macros
+(`SYSCALL_ARG4`, `SYSCALL_NORM`) that implement this and the
+list of wrappers each one covers.
 
 ## Build
 
