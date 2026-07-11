@@ -22,6 +22,14 @@ SRCS += \
     sendmsg.asm \
     recvmsg.asm
 
+# Options and introspection.
+SRCS += \
+    getsockopt.asm \
+    setsockopt.asm \
+    getsockname.asm \
+    getpeername.asm \
+    socketpair.asm
+
 OBJS := $(SRCS:.asm=.o)
 
 UNAME_S := $(shell uname -s)
