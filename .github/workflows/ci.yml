@@ -86,6 +86,8 @@ jobs:
             [21-cli-args]=1
             [22-struct-return]=100
             [23-macros]=42
+            [24-static-link]=0
+            [25-open-socket]=0
             [26-bind-socket]=0
           )
           # Examples that read from stdin get an empty pipe so they hit
