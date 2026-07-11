@@ -33,6 +33,16 @@ extern long resolv_decode_records(const unsigned char *buf, size_t len,
     __asm__("resolv_decode_records");
 extern long resolv_random(void *buf, size_t len) __asm__("resolv_random");
 
+/* v1.3: v6 hosts + hostname entry points. Link-time-only check —
+ * the smoke test does not exercise them against real files. */
+extern long resolv_hosts_lookup6(const char *path, const char *name,
+                                  unsigned char *out16) __asm__("resolv_hosts_lookup6");
+extern long resolv_hostname_at6(const char *hosts, const char *conf,
+                                 const char *name,
+                                 unsigned char *out16) __asm__("resolv_hostname_at6");
+extern long resolv_hostname6(const char *name,
+                              unsigned char *out16) __asm__("resolv_hostname6");
+
 static int fail(int id) {
     fprintf(stderr, "FAIL:%d\n", id);
     return 1;
@@ -70,6 +80,28 @@ int main(void) {
      * shared -errno convention — non-negative means success. */
     unsigned char rand_buf[8] = {0};
     if (resolv_random(rand_buf, sizeof rand_buf) < 0) return fail(8);
+
+    /* 6: v6 hosts lookup against a missing file → negative errno.
+     * Link-time check — the archive must export the symbol and
+     * the function must respect the -errno convention.
+     * We assert only "returns negative", since the exact errno
+     * (-ENOENT vs -EACCES) depends on the platform. */
+    unsigned char v6[16] = {0};
+    if (resolv_hosts_lookup6("/proc/libresolv/does-not-exist-",
+                              "any.test", v6) >= 0) return fail(9);
+
+    /* 7: v6 hostname_at against a missing hosts + missing conf
+     * returns some negative errno. Same link-time-only intent. */
+    if (resolv_hostname_at6("/proc/libresolv/does-not-exist-",
+                             "/proc/libresolv/does-not-exist-",
+                             "any.test", v6) >= 0) return fail(10);
+
+    /* 8: link-time reference to resolv_hostname6. We do not call
+     * it (would hit real /etc/resolv.conf on the CI runner). A
+     * dead reference through a volatile function pointer is
+     * enough to fail the link if the symbol is missing. */
+    long (* volatile sink)(const char *, unsigned char *) = resolv_hostname6;
+    (void)sink;
 
     puts("PASS");
     return 0;

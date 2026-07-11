@@ -1,16 +1,27 @@
-; resolv_hosts_lookup(path: rdi, name: rsi, out_ip: rdx)
+; resolv_hosts_lookup (path: rdi, name: rsi, out_ip: rdx)
+; resolv_hosts_lookup6(path: rdi, name: rsi, out_ip16: rdx)
 ;     -> rax = 0 or negative errno
 ;
 ; Reads the /etc/hosts-format file at *path*, walks its lines
 ; looking for a hostname that matches *name* (case-insensitive),
-; and writes the associated IPv4 address to *out_ip*. Same
+; and writes the associated address to *out_ip* (4 bytes for
+; the v4 entry point, 16 bytes for the v6 entry point). Same
 ; -errno convention every libs/ archive uses:
 ;
-;   0             match found; out_ip populated with the four
-;                 wire-order bytes of the mapped address
+;   0             match found; out_ip populated with the wire-
+;                 order bytes of the mapped address
 ;   -ENOENT (-2)  file was well-formed but held no matching name
+;                 of the requested family
 ;   -errno        the open() / pread() / close() syscall failed;
 ;                 the wrapper's negative errno passes through
+;
+; The two entry points share the parser; a stack-spilled family
+; flag drives the two places behavior differs (which inet_pton
+; to call for the first field, and how many bytes to copy on a
+; match). A v4 entry point silently skips IPv6 lines; a v6
+; entry point silently skips IPv4 lines. Neither treats a
+; foreign-family address as an error — real /etc/hosts files
+; routinely mix families.
 ;
 ; File format (POSIX /etc/hosts):
 ;
@@ -21,9 +32,10 @@
 ;   * Whitespace (space and tab) separates fields. Multiple
 ;     whitespace characters collapse to one separator.
 ;   * The first field on a non-blank line is an IPv4 address in
-;     dotted-decimal form; if it does not parse via
-;     inet_pton4, the whole line is skipped (which covers
-;     IPv6 entries transparently, since the parser rejects them).
+;     dotted-decimal form (for the v4 entry point) or an IPv6
+;     address in RFC 4291 form (for the v6 entry point); if it
+;     does not parse via the matching inet_pton, the whole
+;     line is skipped.
 ;   * The remaining fields are the canonical hostname followed
 ;     by zero or more aliases. Any of them may match *name*.
 ;   * Hostname matching is case-insensitive on the ASCII range;
@@ -49,9 +61,10 @@
 default rel
 
 extern open, pread                  ; libio
-extern close, inet_pton4            ; libsock
+extern close, inet_pton4, inet_pton6 ; libsock
 
 global resolv_hosts_lookup
+global resolv_hosts_lookup6
 
 section .text
 
@@ -72,24 +85,50 @@ section .text
 ;                          current line — 8-byte pointer
 ;   [rsp+8]                LINE_END_BYTE: the byte we clobbered
 ;                          (usually 0x0A) — 1 byte
-;   [rsp+16 .. rsp+19]     IP_SCRATCH: inet_pton4's 4-byte output
-;                          slot. Deliberately disjoint from the
-;                          line-end save above — an earlier
-;                          revision aliased them and inet_pton4
-;                          would trash the low half of the saved
-;                          pointer, then the outer's `mov [rcx],
-;                          al` restore would SIGSEGV on the
-;                          corrupted address.
-;   [rsp+20 .. rsp+31]     padding for 16-byte alignment
+;   [rsp+9]                FAMILY_FLAG: 0 for the v4 entry point,
+;                          1 for the v6 entry point; drives the
+;                          two inet_pton / copy-width branches
+;                          in the shared parser
+;   [rsp+10 .. rsp+15]     padding for 16-byte alignment
+;   [rsp+16 .. rsp+31]     IP_SCRATCH: inet_pton's output slot.
+;                          Widened from 4 to 16 bytes in v1.3 so
+;                          inet_pton6 has room. The v4 entry
+;                          reads only the low 4 bytes. Kept
+;                          disjoint from the line-end save above
+;                          — an earlier revision aliased them
+;                          and inet_pton4 would trash the low
+;                          half of the saved pointer, then the
+;                          outer's `mov [rcx], al` restore would
+;                          SIGSEGV on the corrupted address.
 ;   [rsp+32 .. rsp+4128]   4096-byte read buffer
 
 %define LINE_END_ADDR  0
 %define LINE_END_BYTE  8
+%define FAMILY_FLAG    9
 %define IP_SCRATCH     16
 %define BUF_OFF        32
 %define STACK_SIZE     4128
 
+; Both entry points share the parser via `hosts_body`. r10b
+; holds the family flag from entry (0 = v4, 1 = v6); it is
+; caller-saved but not touched between the initial `mov` and
+; the `mov [rsp + …]` spill inside the body.
+;
+; NASM anchors local (`.foo`) labels to the last non-local
+; label. If either entry point were followed directly by a
+; `.foo`, that label would be scoped to the entry point rather
+; than to the shared body. Naming the body with a non-local
+; symbol (`hosts_body`) anchors every `.foo` below it under
+; that symbol regardless of which entry point ran.
 resolv_hosts_lookup:
+    xor r10d, r10d                  ; family = v4
+    jmp hosts_body
+
+resolv_hosts_lookup6:
+    mov r10d, 1                     ; family = v6
+    ; fall through into hosts_body
+
+hosts_body:
     push rbx
     push rbp
     push r12
@@ -98,8 +137,9 @@ resolv_hosts_lookup:
     push r15
     sub rsp, STACK_SIZE
 
+    mov [rsp + FAMILY_FLAG], r10b   ; spill family so .try_line can read it
     mov rbx, rsi                    ; name
-    mov r15, rdx                    ; out_ip
+    mov r15, rdx                    ; out_ip (4 bytes for v4, 16 for v6)
     lea r12, [rsp + BUF_OFF]
 
     ; --- open(path, O_RDONLY, 0) ---
@@ -274,16 +314,22 @@ resolv_hosts_lookup:
     mov r11, r9                     ; save the address
     mov byte [r9], 0
 
-    ; r10 and r11 are caller-saved, and inet_pton4 will clobber
+    ; r10 and r11 are caller-saved, and inet_ptonX will clobber
     ; both. Stash them on the stack across the call. Two extra
-    ; 8-byte pushes shift the outer's IP_SCRATCH slot from
-    ; [rsp+24] to [rsp+40].
+    ; 8-byte pushes shift the outer's IP_SCRATCH / FAMILY_FLAG
+    ; slots from [rsp+24] to [rsp+40].
     push r10
     push r11
 
     mov rdi, r12
     lea rsi, [rsp + 40 + IP_SCRATCH]
+    cmp byte [rsp + 40 + FAMILY_FLAG], 0
+    jne .call_pton6
     call inet_pton4
+    jmp .after_pton
+.call_pton6:
+    call inet_pton6
+.after_pton:
 
     pop r11
     pop r10
@@ -292,7 +338,7 @@ resolv_hosts_lookup:
     mov [r11], r10b
 
     test eax, eax
-    jz .no_match                    ; not an IPv4 → skip line
+    jz .no_match                    ; wrong family or malformed → skip line
 
     ; Advance past the IP field and its trailing whitespace.
     mov r12, r11
@@ -338,9 +384,21 @@ resolv_hosts_lookup:
     test al, al
     jnz .field_mismatch
     ; --- Match found: copy the parsed IP into *out_ip. ---
-    lea rax, [rsp + 24 + IP_SCRATCH] ; two pushes + return addr
-    mov r8d, [rax]                  ; four wire-order bytes
+    ; Two pushes (r12 + r13) + return addr = 24 bytes on top of
+    ; the outer frame, so the outer's IP_SCRATCH / FAMILY_FLAG
+    ; slots live at [rsp+24 + …] here.
+    lea rax, [rsp + 24 + IP_SCRATCH]
+    cmp byte [rsp + 24 + FAMILY_FLAG], 0
+    jne .copy_v6
+    mov r8d, [rax]                  ; 4 wire-order bytes for v4
     mov [r15], r8d
+    jmp .copy_done
+.copy_v6:
+    mov r8, [rax]                   ; 16 wire-order bytes for v6
+    mov r9, [rax + 8]
+    mov [r15], r8
+    mov [r15 + 8], r9
+.copy_done:
     mov eax, 1
     jmp .try_done
 

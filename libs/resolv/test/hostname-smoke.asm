@@ -35,6 +35,15 @@
 ;     &ip) → negative errno (either -ETIMEDOUT if the DNS
 ;     recvfrom times out, or -ECONNREFUSED if the kernel
 ;     returned ICMP fast)
+;   3 v6 hit path: resolv_hostname_at6(hosts, conf, "libresolv-
+;     hostname-v6.test", &ip16) → 0, ip16 = 2001:db8::1
+;   4 v6 miss path: resolv_hostname_at6(hosts, conf, "no-such.
+;     test", &ip16) → negative errno (same rationale as 2, but
+;     via the AAAA path)
+;
+; Fail IDs past 9 use letters — see hosts-smoke for the
+; convention. The v6 sub-checks stay in the digit range so
+; this file does not need it.
 
 %ifndef HOSTS_PATH
 %define HOSTS_PATH "/tmp/libresolv-hostname-hosts-default"
@@ -53,7 +62,7 @@
 
 default rel
 
-extern resolv_hostname_at
+extern resolv_hostname_at, resolv_hostname_at6
 
 global _start
 global _main
@@ -64,8 +73,12 @@ conf_path:  db CONF_PATH, 0
 
 n_hit:      db "libresolv-hostname-hit.test", 0
 n_miss:     db "no-such.test", 0
+n_v6_hit:   db "libresolv-hostname-v6.test", 0
 
 exp_hit:    db 198, 18, 0, 1
+
+; 2001:db8::1 as 16 network-order bytes.
+exp_v6_hit: db 0x20, 0x01, 0x0d, 0xb8, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1
 
 pass_msg: db "PASS", 10
 pass_len: equ $ - pass_msg
@@ -77,6 +90,7 @@ fail_len  equ $ - fail_msg
 
 section .bss
 ip_buf:   resb 4
+ip6_buf:  resb 16
 
 section .text
 
@@ -107,6 +121,33 @@ _main:
     test rax, rax
     jns .fail
 
+    ; 3: v6 hit path → success from hosts, no DNS traffic
+    mov byte [fail_id], '3'
+    lea rdi, [hosts_path]
+    lea rsi, [conf_path]
+    lea rdx, [n_v6_hit]
+    lea rcx, [ip6_buf]
+    call resolv_hostname_at6
+    test rax, rax
+    jnz .fail
+    lea rdi, [ip6_buf]
+    lea rsi, [exp_v6_hit]
+    mov ecx, 16
+    call memeq
+    test rax, rax
+    jz .fail
+
+    ; 4: v6 miss → falls to AAAA DNS at a dead port. Any negative
+    ; rax is acceptable (same rationale as sub-check 2).
+    mov byte [fail_id], '4'
+    lea rdi, [hosts_path]
+    lea rsi, [conf_path]
+    lea rdx, [n_miss]
+    lea rcx, [ip6_buf]
+    call resolv_hostname_at6
+    test rax, rax
+    jns .fail
+
     ; PASS
     mov rax, SYS_write
     mov edi, 1
@@ -126,3 +167,21 @@ _main:
     mov rax, SYS_exit
     mov edi, 1
     syscall
+
+; memeq(rdi=a, rsi=b, ecx=len) → rax = 1 if equal else 0
+memeq:
+    xor edx, edx
+.mem_loop:
+    cmp edx, ecx
+    jge .mem_eq
+    mov al, [rdi + rdx]
+    cmp al, [rsi + rdx]
+    jne .mem_ne
+    inc edx
+    jmp .mem_loop
+.mem_eq:
+    mov eax, 1
+    ret
+.mem_ne:
+    xor eax, eax
+    ret
