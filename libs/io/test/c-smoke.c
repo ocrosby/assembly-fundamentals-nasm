@@ -67,6 +67,10 @@ extern int  mkdir (const char *path, unsigned mode)                        __asm
 extern int  rmdir (const char *path)                                       __asm__("rmdir");
 extern int  io_size(int fd, long *out)                                     __asm__("io_size");
 
+/* v1.2: path-based stat + atomic rename. */
+extern int  stat  (const char *path, void *statbuf)                        __asm__("stat");
+extern int  rename(const char *oldpath, const char *newpath)               __asm__("rename");
+
 /* close still lives in libsock, not libio. Fall through to libc's
  * default so we don't pull libsock in for one syscall. */
 extern int close(int fd);
@@ -135,6 +139,29 @@ int main(void) {
      * returns a negative errno. */
     if (unlink(path) != 0)                          return fail(19);
     if (unlink(path) >= 0)                          return fail(20);
+
+    /* v1.2: stat + rename end-to-end. */
+    const char *p1 = "/tmp/libio-c-smoke.tmp";
+    const char *p2 = "/tmp/libio-c-smoke.tmp2";
+    unlink(p1); unlink(p2);
+    fd = open(p1, O_RDWR | O_CREAT, 0600);
+    if (fd < 0)                                     return fail(21);
+    if (pwrite(fd, "abc", 3, 0) != 3)               return fail(22);
+    if (close(fd) != 0)                             return fail(23);
+
+    /* 24: stat on the freshly-created file — succeeds. */
+    if (stat(p1, statbuf) != 0)                     return fail(24);
+
+    /* 25: rename to a fresh target. */
+    if (rename(p1, p2) != 0)                        return fail(25);
+
+    /* 26: stat on the old path now fails (source gone). */
+    if (stat(p1, statbuf) >= 0)                     return fail(26);
+
+    /* 27: stat on the new path succeeds. */
+    if (stat(p2, statbuf) != 0)                     return fail(27);
+
+    unlink(p2);
 
     puts("PASS");
     return 0;

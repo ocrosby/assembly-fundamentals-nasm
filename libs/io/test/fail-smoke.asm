@@ -18,6 +18,8 @@
 ;   6 unlink      — bad path  → -ENOENT         (v1.1)
 ;   7 mkdir       — parent of bad path missing  (v1.1)
 ;   8 rmdir       — bad path  → -ENOENT         (v1.1)
+;   9 stat        — bad path  → -ENOENT         (v1.2)
+;   A rename      — both bad  → -ENOENT         (v1.2)
 ;
 ; Prints "PASS\n" and exits 0 when every wrapper returned a
 ; negative value from its intentionally-broken call. Prints
@@ -45,6 +47,7 @@ default rel
 
 extern open, openat, lseek, pread, pwrite
 extern fstat, unlink, mkdir, rmdir
+extern stat, rename
 
 global _start
 global _main
@@ -52,7 +55,9 @@ global _main
 section .rodata
 ; Path that reliably does not exist on either platform. /proc is
 ; empty on macOS; the sentinel filename is empty on Linux.
-bad_path: db "/proc/libio/does-not-exist-", 0
+bad_path:  db "/proc/libio/does-not-exist-", 0
+; A second bad path so rename has distinct source and destination.
+bad_path2: db "/proc/libio/does-not-exist-b", 0
 
 pass_msg: db "PASS", 10
 pass_len: equ $ - pass_msg
@@ -138,6 +143,20 @@ _main:
     lea rdi, [bad_path]
     call rmdir
     EXPECT_NEGATIVE '8'
+
+    ; 9: stat(bad_path, buf) -> -ENOENT
+    lea rdi, [bad_path]
+    lea rsi, [buf]                   ; 32-byte buf — kernel never
+                                     ; touches it on the -ENOENT
+                                     ; short-circuit
+    call stat
+    EXPECT_NEGATIVE '9'
+
+    ; A: rename(bad_path, bad_path2) -> -ENOENT
+    lea rdi, [bad_path]
+    lea rsi, [bad_path2]
+    call rename
+    EXPECT_NEGATIVE 'A'
 
     ; PASS
     mov rax, SYS_write
