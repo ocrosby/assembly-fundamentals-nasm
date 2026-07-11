@@ -90,6 +90,33 @@ follows.
 | `fchmodat` | `dirfd`, `path`, `mode`, `flags`                             | `0` or negative errno                |
 | `fchownat` | `dirfd`, `path`, `uid`, `gid`, `flags`                       | `0` or negative errno                |
 
+**v1.7 — fd-graph manipulation:**
+
+| Symbol | Arguments             | Returns                              |
+| ------ | --------------------- | ------------------------------------ |
+| `dup`  | `oldfd`               | new fd or negative errno             |
+| `dup2` | `oldfd`, `newfd`      | `newfd` or negative errno            |
+| `pipe` | `pipefd*` (int[2])    | `0` or negative errno; writes both fds into the array |
+
+`dup` and `dup2` are one-liner syscall wrappers — Darwin and
+Linux agree on the calling convention. `pipe` is the outlier:
+its Linux syscall writes both fds into the caller-supplied
+`int[2]` and returns `0`/`-errno` conventionally, but the
+macOS BSD syscall (42) returns the read end in `rax` and the
+write end in `rdx` directly. libio's wrapper hides that
+difference — callers pass an `int[2]` on both platforms; on
+macOS the wrapper saves the pointer, runs the syscall, and
+if it succeeds fans `rax` and `rdx` into `pipefd[0]` and
+`pipefd[1]` before returning `0`. Fully documented in
+[`pipe.asm`](syscall/pipe.asm).
+
+`dup`'s returned fd never has `FD_CLOEXEC` set even if the
+source did (POSIX rule). `dup2` closes the destination fd
+atomically before pointing it at the new open file
+description — critical for `stdin` / `stdout` redirection in
+child processes without a race window where the destination
+is closed but nothing has taken its place.
+
 `fchmodat` and `fchownat` are the dirfd-scoped counterparts to
 `chmod` (v1.3) and `chown` (v1.3). Same semantics — the mode
 bits go through the umask, the `-1` sentinel for uid/gid means
@@ -282,6 +309,7 @@ extern getdents                                 ; v1.4
 extern unlinkat, mkdirat, renameat, fstatat     ; v1.5
 extern symlinkat, linkat, readlinkat            ; v1.5
 extern fchmodat, fchownat                       ; v1.6
+extern dup, dup2, pipe                          ; v1.7
 extern io_size                                  ; v1.1 util helper
 extern dir_iter_open, dir_iter_next             ; v1.4 util
 extern dir_iter_close                           ; v1.4 util
@@ -313,7 +341,7 @@ run `make -C ../../libs/io` first.
 make test
 ```
 
-`make test` builds `libio.a` and runs three smoke tests via the
+`make test` builds `libio.a` and runs four smoke tests via the
 harness in [`test/`](test/):
 
 - [`io-smoke.asm`](test/io-smoke.asm) — success path. Sub-checks
@@ -346,6 +374,15 @@ harness in [`test/`](test/):
   `*at()` wrappers when their dirfd is bad).
   Exercises the macOS `SYSCALL_NORM` `neg rax` line on
   every export.
+- [`fdgraph-smoke.asm`](test/fdgraph-smoke.asm) — v1.7's
+  `dup`, `dup2`, and `pipe`. Nine sub-checks: pipe → two
+  positive fds → write + read a two-byte payload across the
+  pipe (via raw `read`/`write` syscalls to avoid pulling
+  libsock in for two bytes) → dup the read end → dup2 into
+  fd 50 → clean up every fd → sub-check 9 confirms
+  `dup(BAD_FD)` returns negative. Lives in a separate file
+  because `io-smoke` has exhausted its single-character
+  sub-check ID space (`1..9`, `A..Z`, `a..y`).
 - [`c-smoke.c`](test/c-smoke.c) — verifies `libio.a` is linkable
   and callable from a normal C toolchain. Uses GCC `__asm__`
   labels to bind libio calls to their bare names (bypassing
@@ -358,6 +395,7 @@ On success the runner prints one line per test:
 ```text
 PASS: io-smoke     output=[PASS]
 PASS: fail-smoke   output=[PASS]
+PASS: fdgraph-smoke output=[PASS]
 PASS: c-smoke      output=[PASS]
 ```
 
@@ -365,8 +403,8 @@ Both platforms are exercised on CI.
 
 ## What is not here — yet
 
-v1.6 covers the `*at()` permission / owner variants (`fchmodat`,
-`fchownat`) on top of v1.5's `*at()` core. Still deferred:
+v1.7 covers fd-graph manipulation (`dup`, `dup2`, `pipe`) on
+top of the v1.6 permissions surface. Still deferred:
 
 - `utimensat` — see the v1.6 symbol section for the reason.
   Would require a per-platform helper on macOS (dispatching
@@ -374,14 +412,17 @@ v1.6 covers the `*at()` permission / owner variants (`fchmodat`,
   is just `SYS_utimensat`. Add if a real consumer needs it.
 - `access`, `faccessat` — permission checks. Skipped for now
   since `open` + errno is more informative.
-- `dup`, `dup2`, `pipe` — fd-graph manipulation. Useful for
-  process plumbing but out of scope for the file-oriented
-  archive.
 - `flock`, `fcntl` — advisory locking / fd flag mutation.
   Both have large flag surfaces; deferred until a real
-  consumer justifies picking a subset.
+  consumer justifies picking a subset. (`fcntl` is where
+  `F_SETFL O_NONBLOCK` and `F_SETFD FD_CLOEXEC` live — a
+  real target for a follow-up subversion.)
 - Async I/O and event notification (`kqueue`, `epoll`,
   `io_uring`). Each is a full archive on its own.
+- `pipe2` (Linux) — the flag-taking variant. libsock's
+  `poll` / `select` cover the "why would you want that" case
+  for most consumers; add if a real target needs
+  `O_CLOEXEC` set atomically at pipe-creation time.
 
 ## Utility helpers
 

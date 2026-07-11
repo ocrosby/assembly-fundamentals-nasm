@@ -110,6 +110,13 @@ extern int  fchmodat  (int dirfd, const char *path, unsigned mode, int flags)   
 extern int  fchownat  (int dirfd, const char *path,
                         unsigned uid, unsigned gid, int flags)                                   __asm__("fchownat");
 
+/* v1.7: fd-graph. pipe's macOS syscall returns the two fds in
+ * rax/rdx; libio's wrapper fans them into pipefd[0..1]
+ * transparently. */
+extern int  dup       (int oldfd)                                                                __asm__("dup");
+extern int  dup2      (int oldfd, int newfd)                                                     __asm__("dup2");
+extern int  pipe      (int *pipefd)                                                              __asm__("pipe");
+
 /* close still lives in libsock, not libio. Fall through to libc's
  * default so we don't pull libsock in for one syscall. */
 extern int close(int fd);
@@ -308,6 +315,26 @@ int main(void) {
 
     if (close(dfd) != 0)                            return fail(66);
     rmdir(atd);
+
+    /* v1.7: dup, dup2, pipe. */
+    int d = dup(0);
+    if (d < 0)                                      return fail(67);
+    if (close(d) != 0)                              return fail(68);
+
+    int pfd[2] = {-1, -1};
+    if (pipe(pfd) != 0)                             return fail(69);
+    if (pfd[0] < 0 || pfd[1] < 0)                   return fail(70);
+    if (close(pfd[0]) != 0)                         return fail(71);
+    if (close(pfd[1]) != 0)                         return fail(72);
+
+    /* dup2 into a specific slot (60 — chosen to avoid stomping
+     * on any fd libc might have opened internally). */
+    int d2 = dup2(0, 60);
+    if (d2 != 60)                                   return fail(73);
+    if (close(60) != 0)                             return fail(74);
+
+    /* Bad fd → negative errno. */
+    if (dup(999999) >= 0)                           return fail(75);
 
     puts("PASS");
     return 0;

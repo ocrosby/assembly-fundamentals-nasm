@@ -82,6 +82,13 @@
 ; "thin wrapper" contract every other libio symbol satisfies.
 %define SYS_fchmodat   0x20001d3
 %define SYS_fchownat   0x20001d4
+; v1.7 additions — fd-graph. SYS_pipe on macOS returns the two
+; new fds in rax and rdx directly rather than writing into a
+; caller-supplied array; libio's pipe wrapper hides that in a
+; %ifdef MACOS block. See pipe.asm for the details.
+%define SYS_dup        0x2000029
+%define SYS_dup2       0x200005a
+%define SYS_pipe       0x200002a
 %else
 %define SYS_open   2
 %define SYS_lseek  8
@@ -124,6 +131,11 @@
 ; the symbol is deferred rather than wrapped asymmetrically.
 %define SYS_fchmodat   268
 %define SYS_fchownat   260
+; v1.7 additions — fd-graph. On Linux SYS_pipe writes both fds
+; into the caller-supplied int[2]; the wrapper is a thin shim.
+%define SYS_dup        32
+%define SYS_dup2       33
+%define SYS_pipe       22
 %endif
 
 ; The stat struct is 144 bytes on both macOS (`struct stat64`)

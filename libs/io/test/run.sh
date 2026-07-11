@@ -71,6 +71,7 @@ cleanup() {
     rm -f "$tmpfile" "$renamed_path" "$tmpfile_v13" "$symlink_path" \
           io-smoke io-smoke.o \
           fail-smoke fail-smoke.o \
+          fdgraph-smoke fdgraph-smoke.o \
           c-smoke /tmp/libio-c-smoke.tmp /tmp/libio-c-smoke.tmp2 \
                   /tmp/libio-c-smoke.link
     rm -rf "$dirpath" "$iter_dir" "$at_dir" \
@@ -125,6 +126,25 @@ if [ "$fail_code" -eq 0 ]; then
     printf "PASS: %-12s output=[%s]\n" "fail-smoke" "$fail_out"
 else
     printf "FAIL: %-12s exit=%d output=[%s]\n" "fail-smoke" "$fail_code" "$fail_out"
+    fail_total=$((fail_total + 1))
+fi
+
+# ---------------------------------------------------------------
+# fdgraph-smoke — v1.7 dup / dup2 / pipe.
+# ---------------------------------------------------------------
+# shellcheck disable=SC2086
+nasm $nasm_fmt fdgraph-smoke.asm -o fdgraph-smoke.o
+"${ld_cmd[@]}" fdgraph-smoke.o "${libs[@]}" -o fdgraph-smoke
+
+set +e
+fdg_out="$(./fdgraph-smoke 2>&1)"
+fdg_code=$?
+set -e
+
+if [ "$fdg_code" -eq 0 ]; then
+    printf "PASS: %-12s output=[%s]\n" "fdgraph-smoke" "$fdg_out"
+else
+    printf "FAIL: %-12s exit=%d output=[%s]\n" "fdgraph-smoke" "$fdg_code" "$fdg_out"
     fail_total=$((fail_total + 1))
 fi
 
