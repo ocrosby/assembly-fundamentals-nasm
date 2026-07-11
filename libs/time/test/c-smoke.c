@@ -65,6 +65,7 @@ extern int  libtime_gettimeofday(struct timeval_local *tv, void *tz)            
 extern int  libtime_sleep_ms    (unsigned int ms)                                                        __asm__("sleep_ms");
 extern int  libtime_getrusage   (int who, struct rusage_scratch *ru)                                     __asm__("getrusage");
 extern long libtime_time_diff_us(const struct timeval_local *late, const struct timeval_local *early)    __asm__("time_diff_us");
+extern long libtime_now_ms      (void)                                                                   __asm__("now_ms");
 
 int main(void) {
     struct timeval_local tv;
@@ -138,6 +139,21 @@ int main(void) {
     if (reversed >= 0) {
         fprintf(stderr, "reversed time_diff_us should be negative, got %ld\n",
             reversed);
+        return 1;
+    }
+
+    /* v1.3: now_ms plausibility and cross-check against
+     * gettimeofday's tv_sec. Should be within ~2s.
+     */
+    long ms = libtime_now_ms();
+    if (ms < 1700000000000L) {
+        fprintf(stderr, "now_ms too small: %ld\n", ms);
+        return 1;
+    }
+    long ms_from_tv = (long)tv.tv_sec * 1000L + (long)tv.tv_usec / 1000L;
+    long dms = ms - ms_from_tv;
+    if (dms < -2000 || dms > 5000) {
+        fprintf(stderr, "now_ms diverged from tv-derived ms by %ld\n", dms);
         return 1;
     }
 

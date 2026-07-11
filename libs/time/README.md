@@ -16,6 +16,12 @@ convention, and no-libc policy every archive under `libs/` follows.
 
 ## Version
 
+**v1.3** — second `util/` helper: `now_ms()`, the "give me
+wall-clock time as a single 64-bit integer" call. Wraps
+`gettimeofday` + `tv_sec * 1000 + tv_usec / 1000` into one
+step, saving log and benchmark code from re-writing the
+combine every time.
+
 **v1.2** — first `util/` helper: `time_diff_us(late, early)`,
 a pure computation that returns the signed microsecond
 difference between two `struct timeval`s.
@@ -42,6 +48,7 @@ left Darwin's 3rd syscall argument uninitialized (see below).
 | Symbol           | Arguments                                     | Returns                                                     |
 | ---------------- | --------------------------------------------- | ----------------------------------------------------------- |
 | `time_diff_us`   | `late*`, `early*` (both `struct timeval*`)    | Signed microsecond delta (`late - early`). Negative sentinels reversed args. |
+| `now_ms`         | (none)                                        | Wall-clock milliseconds since Unix epoch (signed 64-bit), or negative errno if `gettimeofday` failed. |
 
 `gettimeofday` writes the current wall clock to `*tv` as a
 `struct timeval { time_t tv_sec; suseconds_t tv_usec; }` at
@@ -75,6 +82,15 @@ sentinel for benchmark harnesses that want to detect an
 obvious argument-order mistake. Overflow requires the two
 timevals to be more than ~292,471 years apart; callers can
 treat that limit as effectively absent.
+
+`now_ms` is not pure — it calls `gettimeofday` internally —
+but the return shape (a single signed 64-bit integer) makes
+it fit alongside `time_diff_us` in the same `util/` bucket.
+The computation is `tv_sec * 1000 + tv_usec / 1000`, so
+precision is milliseconds derived from `gettimeofday`'s
+microseconds. Wall-clock caveats apply — NTP jumps, DST
+transitions, manual admin adjustments. For elapsed-time
+measurements pin two calls close together and subtract.
 
 ## Darwin gettimeofday 3-arg fix
 
