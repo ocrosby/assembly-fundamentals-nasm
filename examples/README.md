@@ -2,7 +2,7 @@
 
 A constructive sequence of small x86-64 NASM programs. Each example
 introduces exactly one new atomic concept on top of the previous one,
-so reading from `01` to `27` walks the entire control-and-data
+so reading from `01` to `28` walks the entire control-and-data
 vocabulary needed for the early chapters of [../docs/](../docs/).
 
 ## The sequence
@@ -36,6 +36,7 @@ vocabulary needed for the early chapters of [../docs/](../docs/).
 | 25 | [25-open-socket](25-open-socket/)                    | `socket(AF_INET, SOCK_STREAM, 0)` — first call into `libs/sock/libsock.a` | —                                             |
 | 26 | [26-bind-socket](26-bind-socket/)                    | `bind(fd, sockaddr_in*, 16)` — manual `sockaddr_in` for loopback:0       | —                                             |
 | 27 | [27-listen-socket](27-listen-socket/)                | `listen(fd, 8)` — mark the bound socket passive and set the accept queue | —                                             |
+| 28 | [28-fork-child](28-fork-child/)                      | `fork()` + `wait4()` — first call into `libs/proc/libproc.a`             | —                                             |
 
 Examples 1 and 2 do not have a dedicated chapter — they are the
 smallest possible programs and exist so that every later example can
