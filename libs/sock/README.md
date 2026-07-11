@@ -65,18 +65,36 @@ and the no-libc policy.
 | `htonl`  | `u32` host order | `u32` network order (zero-extended in `rax`)     |
 | `ntohl`  | `u32` net order  | `u32` host order (zero-extended in `rax`)        |
 
-### IPv4 text ↔ binary
+### IPv4 / IPv6 text ↔ binary
 
-| Symbol         | Arguments                                    | Returns                                    |
-| -------------- | -------------------------------------------- | ------------------------------------------ |
-| `inet_pton4`   | `src` (NUL-terminated), `dst*` (4 bytes)     | `1` on success, `0` on parse failure       |
-| `inet_ntop4`   | `src` (u32 net order), `dst*`, `dst_size`    | `dst` on success, `NULL` if `size < 16`    |
+| Symbol         | Arguments                                     | Returns                                    |
+| -------------- | --------------------------------------------- | ------------------------------------------ |
+| `inet_pton4`   | `src` (NUL-terminated), `dst*` (4 bytes)      | `1` on success, `0` on parse failure       |
+| `inet_ntop4`   | `src` (u32 net order), `dst*`, `dst_size`     | `dst` on success, `NULL` if `size < 16`    |
+| `inet_pton6`   | `src` (NUL-terminated), `dst*` (16 bytes)     | `1` on success, `0` on parse failure       |
+| `inet_ntop6`   | `src*` (16 bytes net order), `dst*`, `dst_size` | `dst` on success, `NULL` if `size < 46`  |
 
 `inet_pton4` is strict: it rejects leading zeros ("01.2.3.4"),
 out-of-range octets ("1.2.3.256"), missing octets ("1.2.3"), and
 trailing garbage ("1.2.3.4.5"). This matches POSIX `inet_pton()`
 for `AF_INET` and diverges deliberately from the older
 `inet_aton()`, which treats a leading `0` as octal.
+
+`inet_pton6` supports the full RFC 4291 grammar: 1–8 hex groups
+of 1–4 digits, mixed case, `::` compression (at most once,
+expanding to at least one zero group), leading `::` and trailing
+`::`, and the IPv4-mapped tail form `::ffff:192.0.2.1`. It
+rejects the bare-IPv4 form (`1.2.3.4` with no `::` prefix),
+scope IDs (`%eth0`), a single leading colon that is not part of
+`::`, a trailing colon, and any group longer than four hex
+digits.
+
+`inet_ntop6` emits RFC 5952 canonical form: lowercase hex, no
+leading zeros within a group, longest run of two or more zero
+groups compressed to `::` (first run wins on tie), and
+IPv4-mapped addresses printed as `::ffff:a.b.c.d`. The
+destination buffer must be at least `INET6_ADDRSTRLEN` (46
+bytes: `ffff:ffff:ffff:ffff:ffff:ffff:255.255.255.255` plus NUL).
 
 ## What is not here — DNS
 
@@ -85,8 +103,9 @@ for `AF_INET` and diverges deliberately from the older
 implementable as direct syscalls**. Name resolution requires a
 DNS resolver plus name-service switch (`/etc/nsswitch.conf`) plus
 NSS module loading — thousands of lines of code that live inside
-`libc` for a reason. Callers of `libsock.a` supply numeric IPv4
-addresses (via `inet_pton4`) and numeric ports.
+`libc` for a reason. Callers of `libsock.a` supply numeric
+addresses (via `inet_pton4` / `inet_ntop4` for IPv4 or
+`inet_pton6` / `inet_ntop6` for IPv6) and numeric ports.
 
 ## Calling convention notes
 
@@ -137,7 +156,7 @@ extern read, write, send, recv, sendto, recvfrom, sendmsg, recvmsg
 extern getsockopt, setsockopt, getsockname, getpeername, socketpair
 extern select, poll
 extern htons, htonl, ntohs, ntohl
-extern inet_pton4, inet_ntop4
+extern inet_pton4, inet_ntop4, inet_pton6, inet_ntop6
 ```
 
 In the consumer's `Makefile`, append the archive to the link
