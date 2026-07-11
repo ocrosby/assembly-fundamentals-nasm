@@ -6,16 +6,17 @@ format defined by
 [RFC 1035](https://www.rfc-editor.org/rfc/rfc1035.html), sends
 it to a caller-supplied resolver over UDP via
 [`libsock`](../sock/), waits for the response with a bounded
-timeout, and parses the answer section into either a single
-address (A or AAAA), a packed list of addresses, or a CNAME
-target (chased transparently up to eight hops). The
-[`libio`](../io/) archive is used for the `/etc/hosts` and
-`/etc/resolv.conf` layer that the hostname-level entry points
-sit on top of; both IPv4 and IPv6 variants share the parser
-via a family flag. The hostname layer iterates through every
-resolver listed in `/etc/resolv.conf` and, for unqualified
-names, retries with each entry from the `search` / `domain`
-directives.
+timeout, transparently retries over TCP when the response has
+the truncation (`TC=1`) bit set, and parses the answer section
+into either a single address (A or AAAA), a packed list of
+addresses, or a CNAME target (chased transparently up to eight
+hops). The [`libio`](../io/) archive is used for the
+`/etc/hosts` and `/etc/resolv.conf` layer that the hostname-
+level entry points sit on top of; both IPv4 and IPv6 variants
+share the parser via a family flag. The hostname layer
+iterates through every resolver listed in `/etc/resolv.conf`
+and, for unqualified names, retries with each entry from the
+`search` / `domain` directives.
 
 Every routine is a direct syscall (through `libsock`) or pure
 computation — no libc, no libSystem call, no allocation. Same
@@ -121,6 +122,24 @@ non-`-ENOENT` errors (`-ETIMEDOUT`, `-ECONNREFUSED`, `-EIO`,
 libc's stub-resolver behavior — transient errors stop the
 walk; NXDOMAIN keeps it going.
 
+**v1.6 — TCP fallback on truncated (`TC=1`) responses:**
+
+No new exported symbols; the fallback is transparent inside
+`resolv_query`. When a UDP response comes back with the DNS
+header's TC bit set — meaning the answer overflowed the
+512-byte UDP limit — libresolv opens a TCP connection to the
+same resolver, re-sends the same query with a 2-byte
+big-endian length prefix (RFC 1035 §4.2.2), reads the length
+prefix followed by the full response, and hands the result to
+the same decoder path as the UDP flow.
+
+The retry uses the same query ID that was sent over UDP, so
+the decoder's ID check still holds. If the TCP retry itself
+fails (connect refused, recv EOF before the full body arrives,
+malformed length prefix), the errno is returned as if it were
+a UDP error — the caller's resolver-list iterator moves on
+to the next entry.
+
 `resolv_conf_read_all` returns every parseable `nameserver`
 directive packed into `out_buf` as consecutive 8-byte entries:
 
@@ -185,7 +204,7 @@ so callers can `if (rax < 0)` uniformly:
 | `-ENOENT`          | `-2`       | DNS `NXDOMAIN` — the name does not exist                    |
 | `-EIO`             | `-5`       | DNS `SERVFAIL`, or any RCODE without a more specific map    |
 | `-ENODATA`         | `-96` (macOS) / `-61` (Linux) | Well-formed response with no A/IN answer |
-| `-EBADMSG`         | `-74`      | Response truncated, ID mismatch, bad compression pointer    |
+| `-EBADMSG`         | `-74`      | ID mismatch, bad compression pointer, or (v1.6) TCP length prefix > 512 / short read |
 | `-ELOOP`           | `-62` (macOS) / `-40` (Linux) | CNAME chain exceeded the 8-hop limit |
 | `-ETIMEDOUT`       | `-60` (macOS) / `-110` (Linux) | recvfrom timed out (5-second default) |
 | any libsock errno  | (various)  | Underlying socket call failed; the wrapper's errno is passed through |
@@ -196,10 +215,8 @@ constant in `resolv-a.asm`. Future work (v1.1) exposes it as a
 
 ## What is not here — yet
 
-v1.5 adds search-domain iteration on top of v1.4's failover.
-Still deferred:
+v1.6 adds TCP fallback for truncated responses. Still deferred:
 
-- TCP fallback on the truncated (`TC=1`) response
 - DNS-over-IPv6 transport — the resolver IP itself is still a
   32-bit IPv4 address, even for AAAA queries
 - `options ndots:N` — libresolv v1.5 uses a fixed rule
@@ -290,7 +307,7 @@ make test                           # requires python3
 ```
 
 `make test` builds `libresolv.a`, `libsock.a`, `libio.a`, and
-`libasm.a`, then runs seven smoke tests via the harness in
+`libasm.a`, then runs eight smoke tests via the harness in
 [`test/`](test/):
 
 - [`resolv-smoke.asm`](test/resolv-smoke.asm) + `mock-dns.py` —
@@ -310,6 +327,15 @@ make test                           # requires python3
   self-referential CNAME loop (`-ELOOP`), multi-record A with
   `resolv_a_all` (three records for `libresolv-multi.test`),
   and A on an AAAA-only name that comes back as `-ENODATA`.
+- [`v16-smoke.asm`](test/v16-smoke.asm) — exercises the v1.6
+  TCP fallback path. `libresolv-truncated.test` is a canned
+  name whose UDP handler returns a header-only response with
+  `TC=1`; libresolv must open a TCP connection to the same
+  resolver, replay the query with a big-endian 2-byte length
+  prefix, and stitch the untruncated answer together. The
+  test asserts the final `ip` is populated with the real A
+  record, and includes a UDP-only control case so a
+  regression in the non-truncation path is also caught here.
 - [`fail-smoke.asm`](test/fail-smoke.asm) — every libresolv-
   owned syscall wrapper's failure branch. `resolv_random` is
   the only fresh syscall the archive contributes; every other
@@ -360,6 +386,7 @@ On success the runner prints one line per test:
 ```text
 PASS: resolv-smoke   output=[PASS]
 PASS: v12-smoke      output=[PASS]
+PASS: v16-smoke      output=[PASS]
 PASS: hosts-smoke    output=[PASS]
 PASS: resolvconf-smoke output=[PASS]
 PASS: hostname-smoke output=[PASS]

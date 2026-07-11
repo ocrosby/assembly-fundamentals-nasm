@@ -21,6 +21,7 @@ libs/io/test/fail-smoke
 libs/io/test/c-smoke
 libs/resolv/test/resolv-smoke
 libs/resolv/test/v12-smoke
+libs/resolv/test/v16-smoke
 libs/resolv/test/hosts-smoke
 libs/resolv/test/resolvconf-smoke
 libs/resolv/test/hostname-smoke
