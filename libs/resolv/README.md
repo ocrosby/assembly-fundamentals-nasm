@@ -133,6 +133,30 @@ big-endian length prefix (RFC 1035 §4.2.2), reads the length
 prefix followed by the full response, and hands the result to
 the same decoder path as the UDP flow.
 
+**v1.7 — name-plus-port to `sockaddr_in`:**
+
+| Symbol             | Arguments                                                                     | Returns                                    |
+| ------------------ | ----------------------------------------------------------------------------- | ------------------------------------------ |
+| `resolv_sockaddr`  | `name`, `target_port`, `resolver_ip`, `resolver_port`, `sockaddr_in_out*`     | `0` on success, negative errno on failure  |
+
+`resolv_sockaddr` takes the same DNS-resolver arguments as
+`resolv_a` (resolver IP as u32 network-order, resolver port
+as host order) plus a `target_port` (host order) and a
+16-byte caller-allocated `struct sockaddr_in` output buffer.
+On success the output buffer is fully populated — family/len,
+port (network order), address (from DNS, network order),
+sin_zero (zeroed) — ready to hand directly to `connect()` or
+`sendto()`.
+
+Any error from `resolv_a` is passed through unchanged. This
+saves callers writing the same nine-line sockaddr-in
+construction after every DNS lookup and colocates the
+lookup + build into a single call whose result composes
+naturally with `libsock`'s socket-connect flow. libresolv is
+the natural home rather than libsock because libresolv
+already depends on libsock; putting the composed helper the
+other way around would create a circular dependency.
+
 The retry uses the same query ID that was sent over UDP, so
 the decoder's ID check still holds. If the TCP retry itself
 fails (connect refused, recv EOF before the full body arrives,
