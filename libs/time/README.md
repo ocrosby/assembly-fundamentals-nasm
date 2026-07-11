@@ -57,13 +57,12 @@ approach rather than a straight `SYS_*` mapping:
 
 - **`clock_gettime`.** Darwin does not expose the POSIX
   `clock_gettime` as a numbered BSD syscall. The closest kernel
-  interface is
-  [`clock_gettime_nsec_np`](https://developer.apple.com/documentation/kernel/1462446-clock_gettime_nsec_np)
-  at syscall 462, which returns nanoseconds directly in `rax` for
-  a `clock_id_t` argument — non-portable and shaped nothing like
-  Linux's `clock_gettime(clock_id, struct timespec*)` at syscall
-  228. libtime v1.1 will provide `clock_gettime` with a
-  per-platform implementation body that hides the split.
+  interface is `clock_gettime_nsec_np` at syscall 462, which
+  returns nanoseconds directly in `rax` for a `clock_id_t`
+  argument — non-portable and shaped nothing like Linux's
+  `clock_gettime(clock_id, struct timespec*)` at syscall 228.
+  libtime v1.1 will provide `clock_gettime` with a per-platform
+  implementation body that hides the split.
 - **`nanosleep`.** Linux exposes `SYS_nanosleep` at 35 with a
   clean `(const struct timespec *req, struct timespec *rem)`
   signature. macOS routes `nanosleep` through
