@@ -92,6 +92,9 @@
 ; v1.8 additions — fd flags + advisory locks.
 %define SYS_fcntl      0x200005c
 %define SYS_flock      0x2000083
+; v1.9 additions — memory mapping.
+%define SYS_mmap       0x20000c5
+%define SYS_munmap     0x2000049
 %else
 %define SYS_open   2
 %define SYS_lseek  8
@@ -142,6 +145,9 @@
 ; v1.8 additions.
 %define SYS_fcntl      72
 %define SYS_flock      73
+; v1.9 additions.
+%define SYS_mmap       9
+%define SYS_munmap     11
 %endif
 
 ; The stat struct is 144 bytes on both macOS (`struct stat64`)
@@ -303,6 +309,32 @@
 %define LOCK_EX                 2
 %define LOCK_NB                 4
 %define LOCK_UN                 8
+
+; v1.9: mmap protection flags. Values agree across macOS and
+; Linux, drawn from POSIX <sys/mman.h>.
+%define PROT_NONE               0
+%define PROT_READ               1
+%define PROT_WRITE              2
+%define PROT_EXEC               4
+
+; v1.9: mmap sharing/behavior flags. MAP_SHARED, MAP_PRIVATE,
+; MAP_FIXED agree between platforms; MAP_ANON does not — Darwin
+; picks 0x1000, Linux picks 0x20. Callers pass MAP_ANON and the
+; per-platform value is resolved here.
+%define MAP_SHARED              0x01
+%define MAP_PRIVATE             0x02
+%define MAP_FIXED               0x10
+%ifdef MACOS
+%define MAP_ANON                0x1000
+%else
+%define MAP_ANON                0x20
+%endif
+
+; MAP_FAILED as a numeric sentinel — mmap returns this on
+; failure via the SYSCALL_NORM path (a large positive kernel
+; error address normalized to -errno instead of the C-level
+; (void*)-1 sentinel). Kept for callers who want a name.
+%define MAP_FAILED              -1
 
 %macro SYSCALL_NORM 0
     syscall

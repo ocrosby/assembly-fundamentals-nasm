@@ -121,6 +121,22 @@ extern int  pipe      (int *pipefd)                                             
 extern int  fcntl     (int fd, int cmd, int arg)                                                 __asm__("fcntl");
 extern int  flock     (int fd, int op)                                                           __asm__("flock");
 
+/* v1.9: memory mapping. `mmap` returns a `void*`-shaped
+ * address on success and a negative errno on failure; the
+ * signed-long return covers both. */
+extern long mmap      (void *addr, unsigned long len, int prot, int flags,
+                        int fd, long off)                                                        __asm__("mmap");
+extern int  munmap    (void *addr, unsigned long len)                                            __asm__("munmap");
+
+#define PROT_READ_LOCAL   1
+#define PROT_WRITE_LOCAL  2
+#ifdef __APPLE__
+#  define MAP_ANON_LOCAL    0x1000
+#else
+#  define MAP_ANON_LOCAL    0x20
+#endif
+#define MAP_PRIVATE_LOCAL 2
+
 #define F_GETFL 3
 #define F_SETFL 4
 #define F_GETFD 1
@@ -383,6 +399,28 @@ int main(void) {
 
     /* fcntl on BAD_FD → negative errno. */
     if (fcntl(999999, F_GETFL, 0) >= 0)             return fail(85);
+
+    /* v1.9: mmap an anonymous RW page, use it, munmap it.
+     * Then verify the failure path: non-anon mmap on a bad
+     * fd returns a negative value (via SYSCALL_NORM). */
+    {
+        long addr = mmap(NULL, 4096,
+            PROT_READ_LOCAL | PROT_WRITE_LOCAL,
+            MAP_ANON_LOCAL | MAP_PRIVATE_LOCAL,
+            -1, 0);
+        if (addr < 0)                               return fail(86);
+        volatile unsigned char *page = (unsigned char *)addr;
+        page[0] = 0x42;
+        if (page[0] != 0x42)                        return fail(87);
+        if (munmap((void *)addr, 4096) != 0)        return fail(88);
+
+        /* Bad-fd failure path: no MAP_ANON, fd=999999. */
+        long bad = mmap(NULL, 4096,
+            PROT_READ_LOCAL,
+            MAP_PRIVATE_LOCAL,
+            999999, 0);
+        if (bad >= 0)                               return fail(89);
+    }
 
     puts("PASS");
     return 0;

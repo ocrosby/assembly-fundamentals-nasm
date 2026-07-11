@@ -175,6 +175,26 @@ else
 fi
 
 # ---------------------------------------------------------------
+# mmap-smoke — v1.9 mmap + munmap. Needs the shared syscall.inc
+# for PROT_* / MAP_* constants.
+# ---------------------------------------------------------------
+# shellcheck disable=SC2086
+nasm $nasm_fmt -I../syscall/ mmap-smoke.asm -o mmap-smoke.o
+"${ld_cmd[@]}" mmap-smoke.o "${libs[@]}" -o mmap-smoke
+
+set +e
+mmap_out="$(./mmap-smoke 2>&1)"
+mmap_code=$?
+set -e
+
+if [ "$mmap_code" -eq 0 ]; then
+    printf "PASS: %-12s output=[%s]\n" "mmap-smoke" "$mmap_out"
+else
+    printf "FAIL: %-12s exit=%d output=[%s]\n" "mmap-smoke" "$mmap_code" "$mmap_out"
+    fail_total=$((fail_total + 1))
+fi
+
+# ---------------------------------------------------------------
 # c-smoke — cc against libio.a. Force -arch x86_64 on Darwin so
 # clang matches the archive built by nasm -f macho64.
 # ---------------------------------------------------------------
