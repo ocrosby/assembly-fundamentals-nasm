@@ -23,7 +23,7 @@ follows.
 | `resolv_a`                 | `name`, `resolver_ip`, `port`, `out_ip*`                      | `0` on success, negative errno on failure  |
 | `resolv_encode_query`      | `name`, `id`, `out_buf*`                                      | wire length or negative errno              |
 | `resolv_decode_response`   | `buf*`, `len`, `expected_id`, `out_ip*`                       | `0` on success, negative errno on failure  |
-| `resolv_random`            | `buf*`, `len`                                                 | `0` or negative errno                      |
+| `resolv_random`            | `buf*`, `len`                                                 | non-negative on success, negative errno on failure |
 
 `resolv_a` is the entry point most callers use. The other three
 are exposed so consumers that want to run the wire encode /
@@ -92,6 +92,13 @@ on top of libsock. It calls `getentropy` on macOS (syscall 500)
 and `getrandom` on Linux (syscall 318, `flags = 0`) so callers
 never touch `/dev/urandom` and never need `libio`'s file
 primitives just to get 2 bytes of entropy for a query ID.
+
+The two syscalls disagree on their success return: `getentropy`
+returns `0` (it is all-or-nothing), while `getrandom` returns
+the number of bytes delivered. `resolv_random` passes both
+through unchanged, so portable callers use the standard
+`if (rax < 0)` check for failure rather than `if (rax != 0)`,
+which would misfire on Linux even when the call succeeded.
 
 ## Build
 

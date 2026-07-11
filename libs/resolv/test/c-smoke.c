@@ -52,9 +52,14 @@ int main(void) {
     unsigned char ip[4];
     if (resolv_decode_response(q, 4, 0, ip) >= 0)   return fail(4);
 
-    /* 4: random succeeds on a short buffer. */
+    /* 4: random succeeds on a short buffer.
+     *
+     * Return convention differs by platform: macOS's getentropy
+     * returns 0, Linux's getrandom returns the number of bytes
+     * read (== len when the pool is initialized). Use the
+     * shared -errno convention — non-negative means success. */
     unsigned char rand_buf[8] = {0};
-    if (resolv_random(rand_buf, sizeof rand_buf) != 0) return fail(5);
+    if (resolv_random(rand_buf, sizeof rand_buf) < 0) return fail(5);
 
     puts("PASS");
     return 0;
