@@ -2,7 +2,7 @@
 
 A constructive sequence of small x86-64 NASM programs. Each example
 introduces exactly one new atomic concept on top of the previous one,
-so reading from `01` to `30` walks the entire control-and-data
+so reading from `01` to `31` walks the entire control-and-data
 vocabulary needed for the early chapters of [../docs/](../docs/).
 
 ## The sequence
@@ -39,6 +39,7 @@ vocabulary needed for the early chapters of [../docs/](../docs/).
 | 28 | [28-fork-child](28-fork-child/)                      | `fork()` + `wait4()` — first call into `libs/proc/libproc.a`             | —                                             |
 | 29 | [29-server-client](29-server-client/)                | `accept` + `connect` + `read`/`write` — TCP round trip in one process   | —                                             |
 | 30 | [30-shared-mapping](30-shared-mapping/)              | `mmap` + `munmap` — anonymous page allocation with round-trip byte      | —                                             |
+| 31 | [31-mmap-file](31-mmap-file/)                        | file-backed mmap — `ftruncate` + `pwrite` + `mmap(fd, offset)`         | —                                             |
 
 Examples 1 and 2 do not have a dedicated chapter — they are the
 smallest possible programs and exist so that every later example can

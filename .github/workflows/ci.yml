@@ -93,6 +93,7 @@ jobs:
             [28-fork-child]=42
             [29-server-client]=0
             [30-shared-mapping]=42
+            [31-mmap-file]=42
           )
           # Examples that read from stdin get an empty pipe so they hit
           # EOF immediately and exit 0 without waiting for a TTY.
