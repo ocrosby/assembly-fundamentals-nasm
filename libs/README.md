@@ -27,6 +27,7 @@ All archives in this directory share the same conventions:
 | ----------------- | ----------- | ---------------------------------------------------------------------------------------------- |
 | [`asm/`](asm/)    | `libasm.a`  | Formatting and process helpers (`print_string`, `print_int`, `sys_exit`).                      |
 | [`sock/`](sock/)  | `libsock.a` | Berkeley sockets syscall wrappers plus `<arpa/inet.h>` byte-order and IPv4/IPv6 text helpers.  |
+| [`io/`](io/)      | `libio.a`   | File-descriptor primitives from `<fcntl.h>` / `<unistd.h>` (`open`, `openat`, `lseek`, `pread`, `pwrite`). |
 
 Each subdirectory's `README.md` documents the exported symbols and
 calling conventions for that archive.
@@ -38,10 +39,11 @@ Each archive is built independently:
 ```bash
 make -C libs/asm
 make -C libs/sock
+make -C libs/io
 ```
 
-There is no aggregate `libs/Makefile` yet — two archives is not enough
-to justify one.
+There is no aggregate `libs/Makefile` yet — three archives is still
+worth building individually since each has its own test suite.
 
 ## Linking against multiple archives
 
@@ -57,6 +59,16 @@ ld ... consumer.o libhttp.a libsock.a -o consumer
 
 When both archives are independent — as `libasm.a` and `libsock.a` are
 today — the order does not matter.
+
+A consumer that needs both file I/O and socket I/O lists `libio.a`
+alongside `libsock.a`. `libio` deliberately does not export `read`,
+`write`, or `close` — those live in `libsock` and are protocol-neutral,
+so both file and socket callers reach into the same objects rather
+than into duplicate definitions:
+
+```
+ld ... consumer.o libio.a libsock.a -o consumer
+```
 
 ## Platform notes
 
