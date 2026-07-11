@@ -30,6 +30,11 @@ SRCS += \
     getpeername.asm \
     socketpair.asm
 
+# Multiplexing.
+SRCS += \
+    select.asm \
+    poll.asm
+
 OBJS := $(SRCS:.asm=.o)
 
 UNAME_S := $(shell uname -s)
