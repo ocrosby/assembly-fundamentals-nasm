@@ -26,7 +26,7 @@ All archives in this directory share the same conventions:
 | Path              | Archive     | Purpose                                                                                        |
 | ----------------- | ----------- | ---------------------------------------------------------------------------------------------- |
 | [`asm/`](asm/)    | `libasm.a`  | Formatting and process helpers (`print_string`, `print_int`, `sys_exit`).                      |
-| [`sock/`](sock/)  | `libsock.a` | Berkeley sockets syscall wrappers, byte-order helpers, IPv4 `inet_pton4`/`inet_ntop4`.         |
+| [`sock/`](sock/)  | `libsock.a` | Berkeley sockets syscall wrappers plus `<arpa/inet.h>` byte-order and IPv4/IPv6 text helpers.  |
 
 Each subdirectory's `README.md` documents the exported symbols and
 calling conventions for that archive.

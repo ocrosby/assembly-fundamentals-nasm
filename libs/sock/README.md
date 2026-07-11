@@ -1,16 +1,15 @@
 # libs/sock/
 
 Berkeley sockets primitives packaged as the static archive
-`libsock.a`. Every routine is a direct syscall wrapper — no libc,
-no libSystem call, no allocation. The archive tracks the
-syscall-backed portion of the POSIX
+`libsock.a`. The archive tracks the syscall-backed portion of
+POSIX
 [`<sys/socket.h>`](https://pubs.opengroup.org/onlinepubs/9699919799/basedefs/sys_socket.h.html)
-family plus the byte-order and IPv4 address-conversion helpers
-from [`<arpa/inet.h>`](https://pubs.opengroup.org/onlinepubs/9699919799/basedefs/arpa_inet.h.html).
+plus the byte-order and IPv4/IPv6 text-conversion helpers from
+[`<arpa/inet.h>`](https://pubs.opengroup.org/onlinepubs/9699919799/basedefs/arpa_inet.h.html).
 
-See [`../README.md`](../README.md) for the conventions shared by
-every archive in `libs/` — calling convention, error convention,
-and the no-libc policy.
+See [`../README.md`](../README.md) for the shared ABI, error
+convention, and no-libc policy every archive under `libs/`
+follows.
 
 ## Exported symbols
 
@@ -96,19 +95,16 @@ addresses (via `inet_pton4` / `inet_ntop4` for IPv4 or
 
 ## Calling convention notes
 
-Every routine follows the System V AMD64 ABI: arguments in `rdi`,
-`rsi`, `rdx`, `rcx`, `r8`, `r9`; return value in `rax`.
-Callee-saved registers (`rbx`, `rbp`, `r12`–`r15`) are preserved.
-The return contract is uniform on both platforms — non-negative
-on success, negative errno on failure.
-
-Two ABI subtleties are absorbed inside the wrappers: the System V
-4th argument (`rcx`) has to be moved into the syscall ABI slot
-(`r10`), and macOS's carry-flag error convention has to be
-normalized to Linux's `-errno` shape. See
-[`syscall/README.md`](syscall/) for the two macros
-(`SYSCALL_ARG4`, `SYSCALL_NORM`) that implement this and the
-list of wrappers each one covers.
+The [shared `libs/` conventions](../README.md) apply: System V
+AMD64 ABI, callee-saved `rbx` / `rbp` / `r12`–`r15`, uniform
+non-negative-on-success / negative-errno-on-failure contract.
+Two syscall-side subtleties on top of that — moving the SysV
+4th argument from `rcx` into the syscall ABI slot `r10`, and
+normalizing macOS's carry-flag error convention to Linux's
+`-errno` shape — live inside the wrappers themselves. See
+[`syscall/README.md`](syscall/) for the `SYSCALL_ARG4` and
+`SYSCALL_NORM` macros that implement them and the list of
+wrappers each one covers.
 
 ## Build
 
@@ -162,13 +158,12 @@ run `make -C ../../libs/sock` first.
 Wrappers are split into two subdirectories that mirror how the
 code actually works:
 
-- `syscall/` — the 22 kernel-syscall wrappers, plus their shared
-  `syscall.inc` header. Every file in this directory is a
-  three-to-five instruction shim over a single syscall.
-- `inet/` — the 8 pure-computation helpers from POSIX
-  `<arpa/inet.h>`: `htons`, `htonl`, `ntohs`, `ntohl`,
-  `inet_pton4`, `inet_ntop4`, `inet_pton6`, `inet_ntop6`. None
-  of these enter the kernel and none depend on `syscall.inc`.
+- [`syscall/`](syscall/) — 22 kernel-syscall wrappers plus their
+  shared `syscall.inc` header. Every file is a three-to-five
+  instruction shim over a single syscall.
+- [`inet/`](inet/) — 8 pure-computation helpers from POSIX
+  `<arpa/inet.h>` (byte-order + IPv4/IPv6 text conversion). No
+  kernel calls, no shared header.
 
 Each exported symbol lives in a same-named file (`socket.asm`
 exports `socket`, `htons.asm` exports `htons`, and so on). The
