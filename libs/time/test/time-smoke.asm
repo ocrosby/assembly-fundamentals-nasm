@@ -46,6 +46,11 @@
 ;                                          expressed via the
 ;                                          util helper)
 ;   F  time_diff_us(&tv3, &tv4) < 0        (reversed args → negative)
+;
+; v1.3 — now_ms util helper:
+;   G  now_ms() >= 1_700_000_000_000       (Nov 2023 in ms)
+;   H  second now_ms() call within 5000 ms of the first
+;      (monotonic + bounded)
 
 %include "syscall.inc"
 
@@ -59,7 +64,7 @@
 
 default rel
 
-extern gettimeofday, sleep_ms, getrusage, time_diff_us
+extern gettimeofday, sleep_ms, getrusage, time_diff_us, now_ms
 
 global _start
 global _main
@@ -216,6 +221,29 @@ _main:
     call time_diff_us
     test rax, rax
     jns .fail
+
+    ; ---- v1.3: now_ms plausibility -----------------------------
+    ; G: now_ms() >= 1_700_000_000_000  (November 2023 in ms)
+    ;    proves the helper composed gettimeofday + ms math
+    ;    correctly (not just returning 0 or a random value)
+    mov byte [fail_id], 'G'
+    call now_ms
+    mov rcx, 1700000000000
+    cmp rax, rcx
+    jl .fail
+    mov r14, rax                     ; save the first ms reading
+
+    ; H: a second now_ms() call within a few ms of the first
+    ;    proves the wrapper is monotonic within one process
+    ;    and doesn't jitter wildly (upper bound 5_000 ms so a
+    ;    loaded CI runner still fits comfortably)
+    mov byte [fail_id], 'H'
+    call now_ms
+    sub rax, r14                     ; delta ms since sub-check G
+    cmp rax, 0
+    jl .fail                         ; must not go backward
+    cmp rax, 5000
+    jg .fail                         ; must be bounded
 
     ; PASS
     mov rax, SYS_write
