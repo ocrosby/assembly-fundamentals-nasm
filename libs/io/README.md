@@ -71,6 +71,50 @@ follows.
 | `dir_iter_next`  | `iter*`, `name_buf*`, `bufsize`, `type_out*`       | `1` on entry, `0` at end, negative errno   |
 | `dir_iter_close` | `iter*`                                            | `0` or negative errno                      |
 
+**v1.5 — the `*at()` family (scoped path resolution):**
+
+| Symbol       | Arguments                                                    | Returns                              |
+| ------------ | ------------------------------------------------------------ | ------------------------------------ |
+| `unlinkat`   | `dirfd`, `path`, `flags`                                     | `0` or negative errno                |
+| `mkdirat`    | `dirfd`, `path`, `mode`                                      | `0` or negative errno                |
+| `renameat`   | `olddirfd`, `oldpath`, `newdirfd`, `newpath`                 | `0` or negative errno                |
+| `fstatat`    | `dirfd`, `path`, `statbuf*`, `flags`                         | `0` or negative errno                |
+| `symlinkat`  | `target`, `newdirfd`, `linkpath`                             | `0` or negative errno                |
+| `linkat`     | `olddirfd`, `oldpath`, `newdirfd`, `newpath`, `flags`        | `0` or negative errno                |
+| `readlinkat` | `dirfd`, `path`, `buf*`, `bufsize`                           | bytes copied or negative errno       |
+
+The `*at()` family resolves the *path* argument relative to
+*dirfd* — a file descriptor pointing at a directory obtained
+via `open` or `openat`. The special sentinel `AT_FDCWD` (`-2`
+on macOS, `-100` on Linux; exported by `syscall.inc`) means
+"resolve relative to the current working directory", so
+`unlinkat(AT_FDCWD, path, 0)` is semantically identical to
+`unlink(path)`.
+
+Two useful flags are exported for the `flags` slots:
+
+- **`AT_REMOVEDIR`** turns `unlinkat` into `rmdirat` — the
+  entry must be an empty directory. Same value semantics as
+  Linux/glibc.
+- **`AT_SYMLINK_NOFOLLOW`** makes `fstatat` behave like
+  `lstat` when the terminal component is a symlink.
+
+`fstatat` on macOS wraps `fstatat64` (BSD syscall 470), the
+64-bit-inode variant that matches the `stat64` / `fstat64` /
+`lstat64` field layout the v1.1 / v1.2 / v1.3 wrappers use.
+Callers can plug any of the four stat symbols in and expect
+`ST_SIZE_OFF` and its neighbors to work uniformly.
+
+`linkat` creates a **hard** link — a second directory entry
+pointing at the same inode. Cross-filesystem hard links
+fail with `-EXDEV`; hard-linking a directory fails with
+`-EPERM` on both platforms regardless of privileges.
+
+`symlinkat`'s argument order — target first, then
+`newdirfd` + `linkpath` — mirrors POSIX `symlink`. The
+`dirfd` slot applies only to the destination, not to the
+target string (which is stored verbatim as always).
+
 Directory iteration is where the two platforms diverge most —
 Linux's `getdents64` (syscall 217) and macOS's
 `getdirentries64` (BSD syscall 344) return the same raw-byte
@@ -209,6 +253,8 @@ extern stat, rename                             ; v1.2
 extern lstat, chmod, chown, symlink, readlink   ; v1.3
 extern truncate, ftruncate                      ; v1.3
 extern getdents                                 ; v1.4
+extern unlinkat, mkdirat, renameat, fstatat     ; v1.5
+extern symlinkat, linkat, readlinkat            ; v1.5
 extern io_size                                  ; v1.1 util helper
 extern dir_iter_open, dir_iter_next             ; v1.4 util
 extern dir_iter_close                           ; v1.4 util
@@ -254,15 +300,22 @@ harness in [`test/`](test/):
   itself, then both are unlinked. `d..f` cover v1.4: iterate
   a pre-populated ITER_DIR (`mktemp -d` + three regular
   files), verify exactly 5 entries (`.`, `..`, `a`, `b`, `c`),
-  then close the iterator.
+  then close the iterator. `g..s` cover v1.5: open a fresh
+  AT_DIR to get a dirfd, then chain every `*at()` symbol
+  through it — mkdirat/unlinkat(AT_REMOVEDIR) round-trip,
+  openat + renameat, fstatat + symlinkat + readlinkat,
+  linkat, and unlinkat cleanup of each entry, ending in a
+  close of the dirfd.
 - [`fail-smoke.asm`](test/fail-smoke.asm) — failure path. Each
   wrapper is called with args the kernel is guaranteed to
   reject (`/proc/libio/does-not-exist-` → `-ENOENT` for
   `open`, `openat`, `unlink`, `mkdir`, `rmdir`, `stat`,
   `rename`, `lstat`, `chmod`, `chown`, `symlink`, `readlink`,
   `truncate`; `fd=999999` → `-EBADF` for `lseek`, `pread`,
-  `pwrite`, `fstat`, `ftruncate`, `getdents`). Exercises the
-  macOS `SYSCALL_NORM` `neg rax` line on every export.
+  `pwrite`, `fstat`, `ftruncate`, `getdents`, and each of
+  the seven v1.5 `*at()` wrappers when their dirfd is bad).
+  Exercises the macOS `SYSCALL_NORM` `neg rax` line on
+  every export.
 - [`c-smoke.c`](test/c-smoke.c) — verifies `libio.a` is linkable
   and callable from a normal C toolchain. Uses GCC `__asm__`
   labels to bind libio calls to their bare names (bypassing
@@ -282,13 +335,14 @@ Both platforms are exercised on CI.
 
 ## What is not here — yet
 
-v1.4 covers directory iteration via a portable `dir_iter_*`
-helper. Still deferred:
+v1.5 covers the `*at()` family — `openat` (v1.0), plus v1.5's
+`unlinkat` / `mkdirat` / `renameat` / `fstatat` / `symlinkat`
+/ `linkat` / `readlinkat`. A hard-link `link()` wrapper is
+covered by `linkat(AT_FDCWD, …)`. Still deferred:
 
-- `link` (hard-link creation), `linkat`, `symlinkat`,
-  `renameat`, `unlinkat`, `mkdirat`, `fstatat` — the
-  `*at()` family beyond the `openat` already shipped in
-  v1.0. Cheap wrappers once a consumer needs them.
+- `fchmodat`, `fchownat`, `futimesat`, `utimensat` — dirfd-
+  scoped mode/owner/timestamp mutators. Cheap wrappers once
+  a consumer needs them.
 - `access`, `faccessat` — permission checks. Skipped for now
   since `open` + errno is more informative.
 - `dup`, `dup2`, `pipe` — fd-graph manipulation. Useful for

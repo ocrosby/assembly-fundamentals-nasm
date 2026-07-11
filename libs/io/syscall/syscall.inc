@@ -63,6 +63,18 @@
 ; 64-bit-inode `struct dirent` layout that pairs with our stat64
 ; wrapper — same wide inode field on both syscalls.
 %define SYS_getdents  0x2000158
+; v1.5: the *at() family. SYS_fstatat here is Darwin's 64-bit-
+; inode fstatat64 (BSD 470); the older fstatat (469) returns the
+; 32-bit-inode layout that would give callers a different field
+; offset than fstat64 / stat64 / lstat64. Consistency across the
+; whole stat surface matters more than an unused syscall slot.
+%define SYS_unlinkat   0x20001d8
+%define SYS_mkdirat    0x20001db
+%define SYS_renameat   0x20001d1
+%define SYS_fstatat    0x20001d6
+%define SYS_symlinkat  0x20001da
+%define SYS_linkat     0x20001d7
+%define SYS_readlinkat 0x20001d9
 %else
 %define SYS_open   2
 %define SYS_lseek  8
@@ -89,6 +101,17 @@
 %define SYS_ftruncate 77
 ; v1.4: directory iteration.
 %define SYS_getdents  217
+; v1.5: the *at() family. SYS_fstatat on x86_64 Linux is
+; `newfstatat` (262) — the modern variant that returns a
+; 64-bit-inode `struct stat`, matching what SYS_stat / SYS_fstat
+; return on Linux.
+%define SYS_unlinkat   263
+%define SYS_mkdirat    258
+%define SYS_renameat   264
+%define SYS_fstatat    262
+%define SYS_symlinkat  266
+%define SYS_linkat     265
+%define SYS_readlinkat 267
 %endif
 
 ; The stat struct is 144 bytes on both macOS (`struct stat64`)
@@ -183,6 +206,29 @@
 %define DIR_ITER_BUF          32
 %define DIR_ITER_BUF_SIZE     4096
 %define DIR_ITER_SIZE         4128
+
+; -----------------------------------------------------------------
+; v1.5: AT_* flag constants for the *at() family.
+;
+; AT_FDCWD is the sentinel meaning "resolve *path* relative to
+; the current working directory" — so `renameat(AT_FDCWD, "a",
+; AT_FDCWD, "b")` is semantically identical to `rename("a",
+; "b")`. Its numeric value differs between platforms; libc and
+; libio both hide the difference behind the constant.
+;
+; AT_SYMLINK_NOFOLLOW makes `fstatat` behave like `lstat` (do
+; not follow the terminal symlink). AT_REMOVEDIR makes
+; `unlinkat` behave like `rmdir` (the entry must be an empty
+; directory). Both are int flags OR'd into the `flags` slot.
+%ifdef MACOS
+%define AT_FDCWD               -2
+%define AT_SYMLINK_NOFOLLOW    0x0020
+%define AT_REMOVEDIR           0x0080
+%else
+%define AT_FDCWD               -100
+%define AT_SYMLINK_NOFOLLOW    0x100
+%define AT_REMOVEDIR           0x200
+%endif
 
 %macro SYSCALL_NORM 0
     syscall

@@ -41,11 +41,13 @@
 #define O_RDONLY 0
 #define O_RDWR   2
 #ifdef __APPLE__
-#  define O_CREAT  0x0200
-#  define AT_FDCWD (-2)
+#  define O_CREAT     0x0200
+#  define AT_FDCWD    (-2)
+#  define AT_REMOVEDIR 0x0080
 #else
-#  define O_CREAT  0x40
-#  define AT_FDCWD (-100)
+#  define O_CREAT     0x40
+#  define AT_FDCWD    (-100)
+#  define AT_REMOVEDIR 0x200
 #endif
 #define SEEK_SET 0
 #define SEEK_END 2
@@ -87,6 +89,18 @@ extern long dir_iter_open (void *iter, const char *path)                   __asm
 extern long dir_iter_next (void *iter, char *name_buf,
                             unsigned long size, unsigned char *type_out)   __asm__("dir_iter_next");
 extern long dir_iter_close(void *iter)                                     __asm__("dir_iter_close");
+
+/* v1.5: the *at() family. Path resolution scoped to a directory
+ * fd (or to cwd via AT_FDCWD). */
+extern int  unlinkat  (int dirfd, const char *path, int flags)                                   __asm__("unlinkat");
+extern int  mkdirat   (int dirfd, const char *path, unsigned mode)                               __asm__("mkdirat");
+extern int  renameat  (int olddirfd, const char *oldpath,
+                        int newdirfd, const char *newpath)                                       __asm__("renameat");
+extern int  fstatat   (int dirfd, const char *path, void *statbuf, int flags)                    __asm__("fstatat");
+extern int  symlinkat (const char *target, int newdirfd, const char *linkpath)                   __asm__("symlinkat");
+extern int  linkat    (int olddirfd, const char *oldpath,
+                        int newdirfd, const char *newpath, int flags)                            __asm__("linkat");
+extern long readlinkat(int dirfd, const char *path, void *buf, unsigned long bufsize)            __asm__("readlinkat");
 
 /* close still lives in libsock, not libio. Fall through to libc's
  * default so we don't pull libsock in for one syscall. */
@@ -245,6 +259,34 @@ int main(void) {
         unlink(two);
         rmdir(ird);
     }
+
+    /* v1.5: chain the *at() family through a fresh dirfd. */
+    const char *atd = "/tmp/libio-c-smoke.at";
+    rmdir(atd);
+    if (mkdir(atd, 0755) != 0)                      return fail(49);
+    int dfd = open(atd, O_RDONLY, 0);
+    if (dfd < 0)                                    return fail(50);
+
+    if (mkdirat(dfd, "sub", 0755) != 0)             return fail(51);
+    if (unlinkat(dfd, "sub", AT_REMOVEDIR) != 0)    return fail(52);
+
+    {
+        int f = openat(dfd, "f", O_RDWR | O_CREAT, 0644);
+        if (f < 0)                                  return fail(53);
+        close(f);
+    }
+    if (renameat(dfd, "f", dfd, "g") != 0)          return fail(54);
+    if (fstatat(dfd, "g", statbuf, 0) != 0)         return fail(55);
+    if (symlinkat("g", dfd, "ln") != 0)             return fail(56);
+    char rlbuf[64];
+    if (readlinkat(dfd, "ln", rlbuf, sizeof rlbuf) <= 0) return fail(57);
+    if (linkat(dfd, "g", dfd, "h", 0) != 0)         return fail(58);
+
+    if (unlinkat(dfd, "g",  0) != 0)                return fail(59);
+    if (unlinkat(dfd, "ln", 0) != 0)                return fail(60);
+    if (unlinkat(dfd, "h",  0) != 0)                return fail(61);
+    if (close(dfd) != 0)                            return fail(62);
+    rmdir(atd);
 
     puts("PASS");
     return 0;
