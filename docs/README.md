@@ -42,6 +42,9 @@ A progressive walkthrough of x86-64 assembly with NASM. Each guide is intentiona
 - [Floating Point](25-floating-point.md) — scalar single and double
   arithmetic on the SSE `xmm` registers, calling convention, and
   int↔float conversion.
+- [Memory Mapping](26-memory-mapping.md) — `mmap` + `munmap` and the
+  three useful flag combinations: anonymous private scratch,
+  file-backed private view, and `MAP_SHARED` for IPC across `fork`.
 
 ## Appendix
 
