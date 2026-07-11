@@ -2,11 +2,13 @@ NAME    := time
 ARCHIVE := lib$(NAME).a
 
 # syscall/ holds the direct kernel-syscall wrappers plus their
-# shared syscall.inc header. As libtime grows, util/ can hold
-# composed helpers (e.g. time_diff_us) that never enter the
-# kernel and can be reused independently of the wrappers.
+# shared syscall.inc header. util/ holds composed helpers that
+# never enter the kernel and can be reused independently — for
+# example `time_diff_us`, which computes a signed microsecond
+# delta between two `struct timeval`s.
 SYSCALL_SRCS := $(wildcard syscall/*.asm)
-SRCS         := $(SYSCALL_SRCS)
+UTIL_SRCS    := $(wildcard util/*.asm)
+SRCS         := $(SYSCALL_SRCS) $(UTIL_SRCS)
 OBJS         := $(SRCS:.asm=.o)
 
 UNAME_S := $(shell uname -s)
@@ -30,6 +32,12 @@ $(ARCHIVE): $(OBJS)
 # directory. The dependency on syscall.inc forces every wrapper
 # to rebuild when the shared header changes.
 syscall/%.o: syscall/%.asm syscall/syscall.inc
+	nasm $(NASM_FLAGS) -I syscall/ $< -o $@
+
+# util/ helpers %include "syscall.inc" for shared constants
+# (TV_SEC_OFF / TV_USEC_OFF / TIMEVAL_SIZE) even though they
+# never call the kernel.
+util/%.o: util/%.asm syscall/syscall.inc
 	nasm $(NASM_FLAGS) -I syscall/ $< -o $@
 
 # Smoke-test the archive end to end. Invoked via bash so no exec
