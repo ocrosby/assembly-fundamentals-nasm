@@ -74,6 +74,12 @@ extern long client_connect(unsigned ip_net,
                             unsigned short port_host)
     __asm__("client_connect");
 
+/* v1.3 util helpers — bound blocking recv/send to *ms*
+ * milliseconds by hiding the struct timeval marshalling
+ * behind a plain integer. */
+extern long set_recv_timeout_ms(int fd, unsigned ms) __asm__("set_recv_timeout_ms");
+extern long set_send_timeout_ms(int fd, unsigned ms) __asm__("set_send_timeout_ms");
+
 static int fail(int id) {
     fprintf(stderr, "FAIL:%d\n", id);
     return 1;
@@ -150,6 +156,22 @@ int main(void) {
      * fail contract as server_bind_listen. */
     long cfail = client_connect(0x0100007Fu, 1u);
     if (cfail >= 0)                                  return fail(22);
+
+    /* v1.3: bind + close a scratch listening socket, then set
+     * both timeouts on it. The exact syscall the kernel does
+     * is unaffected; we're only checking the wrappers hand back
+     * a clean 0 for a valid fd + non-zero ms. */
+    long sfd3 = server_bind_listen(0u, 0u, 1);
+    if (sfd3 < 0)                                    return fail(23);
+    if (set_recv_timeout_ms((int)sfd3, 250) != 0)    return fail(24);
+    if (set_send_timeout_ms((int)sfd3, 250) != 0)    return fail(25);
+    /* ms=0 → indefinite (same as libc's setsockopt SO_RCVTIMEO
+     * with {0,0}). Verifies the div-by-1000 doesn't trap on 0. */
+    if (set_recv_timeout_ms((int)sfd3, 0)   != 0)    return fail(26);
+    if (close((int)sfd3) != 0)                       return fail(27);
+
+    /* Bad fd → negative errno. */
+    if (set_recv_timeout_ms(999999, 100) >= 0)       return fail(28);
 
     puts("PASS");
     return 0;
