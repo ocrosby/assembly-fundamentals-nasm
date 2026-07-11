@@ -32,6 +32,8 @@
 ;   B recv drained the select marker byte
 ;   C poll() reported POLLIN
 ;   D recv drained the poll marker byte
+;   G send_all(sv[0], 24-byte payload) → 0 (v1.4)
+;   H recv delivered the same 24 bytes  (v1.4)
 ;   E close(sv[0])
 ;   F close(sv[1])
 
@@ -74,7 +76,7 @@
 default rel
 
 extern socketpair, send, recv, sendto, recvfrom, sendmsg, recvmsg
-extern select, poll, close
+extern select, poll, close, send_all
 
 global _start
 global _main
@@ -85,6 +87,8 @@ sto_payload:     db "STO_"
 smsg_payload:    db "SMSG"
 sel_byte:        db "S"
 poll_byte:       db "P"
+sendall_payload: db "SENDALL_PAYLOAD_00000123"   ; 24 bytes for v1.4 send_all check
+sendall_len:     equ $ - sendall_payload
 
 pass_msg: db "PASS", 10
 pass_len: equ $ - pass_msg
@@ -302,6 +306,42 @@ _main:
     jne .fail
     cmp byte [buf], 'P'
     jne .fail
+
+    ; ---- v1.4: send_all + recv round trip ----
+    ; G: send_all(sv[0], sendall_payload, sendall_len) → 0
+    mov byte [fail_id], 'G'
+    mov edi, r12d
+    lea rsi, [sendall_payload]
+    mov edx, sendall_len
+    call send_all
+    test rax, rax
+    jnz .fail
+
+    ; H: recv(sv[1], buf, sendall_len, 0) delivers same bytes.
+    ; AF_UNIX SOCK_STREAM's kernel buffer is well over 24 bytes,
+    ; so a single recv should drain the whole payload.
+    mov byte [fail_id], 'H'
+    mov edi, r13d
+    lea rsi, [buf]
+    mov edx, sendall_len
+    xor ecx, ecx                    ; flags = 0
+    call recv
+    cmp rax, sendall_len
+    jne .fail
+
+    ; Compare payload bytes. Loop `sendall_len` bytes and
+    ; bail on any mismatch.
+    lea rbx, [sendall_payload]
+    lea r15, [buf]
+    mov rcx, sendall_len
+.cmp_loop:
+    mov al, [rbx]
+    cmp al, [r15]
+    jne .fail
+    inc rbx
+    inc r15
+    dec rcx
+    jnz .cmp_loop
 
     ; ---- E-F: close both fds ----
     mov byte [fail_id], 'E'
