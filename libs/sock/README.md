@@ -82,7 +82,7 @@ emits the RFC 5952 canonical form. Buffer-size requirements are
 exact accepted grammar, rejection cases, and canonical-form
 rules.
 
-### Composed helpers (v1.1 / v1.2 / v1.3)
+### Composed helpers (v1.1 / v1.2 / v1.3 / v1.4)
 
 | Symbol                 | Arguments                                                    | Returns                              |
 | ---------------------- | ------------------------------------------------------------ | ------------------------------------ |
@@ -90,6 +90,7 @@ rules.
 | `client_connect`       | `ip_net` (u32 net order), `port_host` (u16)                  | fd or negative errno                 |
 | `set_recv_timeout_ms`  | `fd` (int), `ms` (u32)                                       | `0` or negative errno                |
 | `set_send_timeout_ms`  | `fd` (int), `ms` (u32)                                       | `0` or negative errno                |
+| `send_all`             | `fd` (int), `buf*`, `len` (u64)                              | `0` (all sent) or negative errno     |
 
 `server_bind_listen` composes the four syscalls that every TCP
 server always makes into one call: `socket(AF_INET,
@@ -126,6 +127,18 @@ socket fully non-blocking (return immediately with
 `-EAGAIN` whenever it would block, without any wait), use
 `fcntl(F_SETFL, O_NONBLOCK)` instead — these timeouts only
 bound the blocking wait, not the polling shape.
+
+`send_all` (v1.4) is the "please just get all these bytes
+onto the wire" call. `write` can return fewer bytes than
+requested — for tiny buffers on a fresh socket it usually
+does not, but for larger payloads or a socket whose peer is
+reading slowly, short writes are common. `send_all` factors
+the loop out so callers stop having to. It advances the buf
+pointer and shrinks the remaining count on each partial
+success; the first negative errno from `write` propagates
+unchanged. `send_all` does **not** retry on `-EINTR` —
+callers that want SA_RESTART-style behavior wrap the call
+in their own retry.
 
 ## What is not here — DNS
 
