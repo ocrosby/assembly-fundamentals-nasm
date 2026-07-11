@@ -62,6 +62,37 @@ follows.
 | `truncate`  | `path`, `length`               | `0` or negative errno                |
 | `ftruncate` | `fd`, `length`                 | `0` or negative errno                |
 
+**v1.4 — directory iteration (portable):**
+
+| Symbol           | Arguments                                          | Returns                                    |
+| ---------------- | -------------------------------------------------- | ------------------------------------------ |
+| `getdents`       | `fd`, `buf*`, `count`, `position*`                 | bytes filled, `0` at end, or negative errno |
+| `dir_iter_open`  | `iter*`, `path`                                    | `0` or negative errno                      |
+| `dir_iter_next`  | `iter*`, `name_buf*`, `bufsize`, `type_out*`       | `1` on entry, `0` at end, negative errno   |
+| `dir_iter_close` | `iter*`                                            | `0` or negative errno                      |
+
+Directory iteration is where the two platforms diverge most —
+Linux's `getdents64` (syscall 217) and macOS's
+`getdirentries64` (BSD syscall 344) return the same raw-byte
+stream shape but the `d_type` and `d_name` offsets inside each
+record differ. `getdents` is a thin wrapper that hides only
+the syscall number difference. `dir_iter_*` (in `util/`) hide
+the record layout entirely.
+
+The iterator uses a caller-allocated **opaque state block** of
+`DIR_ITER_SIZE` (4128) bytes — includes the fd, refill
+position, and a 4096-byte scratch buffer. NASM callers
+`resb DIR_ITER_SIZE`; C callers reserve `unsigned char
+iter[4128]`. No heap dependency, no hidden globals.
+
+`dir_iter_next`'s three-valued return (`1` = have entry, `0`
+= end of directory, negative = errno) fits the archive's
+"non-negative on success" convention while making
+end-of-directory a first-class value rather than a special
+errno. `d_type` is written to `*type_out` as one of the
+`DT_*` constants — same values on both platforms, exported by
+`syscall.inc`.
+
 `lstat` is `stat`'s "don't follow the terminal symlink"
 variant. The struct layout matches `stat` / `fstat` — same
 `ST_SIZE_OFF` etc. — so a caller that already knows the
@@ -177,7 +208,10 @@ extern fstat, unlink, mkdir, rmdir              ; v1.1
 extern stat, rename                             ; v1.2
 extern lstat, chmod, chown, symlink, readlink   ; v1.3
 extern truncate, ftruncate                      ; v1.3
-extern io_size                                  ; v1.1 (util helper)
+extern getdents                                 ; v1.4
+extern io_size                                  ; v1.1 util helper
+extern dir_iter_open, dir_iter_next             ; v1.4 util
+extern dir_iter_close                           ; v1.4 util
 ```
 
 In the consumer's `Makefile`, append the archive to the link
@@ -217,15 +251,18 @@ harness in [`test/`](test/):
   path-based `truncate` shrinks it again and `stat` verifies,
   `chmod` + `chown(-1,-1)` succeed, `symlink` creates a link
   and `readlink` reads it back, `lstat` inspects the link
-  itself, then both are unlinked.
+  itself, then both are unlinked. `d..f` cover v1.4: iterate
+  a pre-populated ITER_DIR (`mktemp -d` + three regular
+  files), verify exactly 5 entries (`.`, `..`, `a`, `b`, `c`),
+  then close the iterator.
 - [`fail-smoke.asm`](test/fail-smoke.asm) — failure path. Each
   wrapper is called with args the kernel is guaranteed to
   reject (`/proc/libio/does-not-exist-` → `-ENOENT` for
   `open`, `openat`, `unlink`, `mkdir`, `rmdir`, `stat`,
   `rename`, `lstat`, `chmod`, `chown`, `symlink`, `readlink`,
   `truncate`; `fd=999999` → `-EBADF` for `lseek`, `pread`,
-  `pwrite`, `fstat`, `ftruncate`). Exercises the macOS
-  `SYSCALL_NORM` `neg rax` line on every export.
+  `pwrite`, `fstat`, `ftruncate`, `getdents`). Exercises the
+  macOS `SYSCALL_NORM` `neg rax` line on every export.
 - [`c-smoke.c`](test/c-smoke.c) — verifies `libio.a` is linkable
   and callable from a normal C toolchain. Uses GCC `__asm__`
   labels to bind libio calls to their bare names (bypassing
@@ -245,18 +282,13 @@ Both platforms are exercised on CI.
 
 ## What is not here — yet
 
-v1.3 fills in the remaining common single-syscall wrappers
-around POSIX files (`lstat`, `chmod`, `chown`, `symlink`,
-`readlink`, `truncate`, `ftruncate`). Still deferred:
+v1.4 covers directory iteration via a portable `dir_iter_*`
+helper. Still deferred:
 
-- Directory iteration (`getdents64` on Linux, `getdirentries`
-  on macOS). `struct dirent` layouts vary by platform and the
-  syscall shape differs, so a portable helper is a larger
-  design task.
 - `link` (hard-link creation), `linkat`, `symlinkat`,
-  `renameat` — the `*at()` family beyond the `openat` already
-  shipped in v1.0. Cheap wrappers once a consumer needs
-  them.
+  `renameat`, `unlinkat`, `mkdirat`, `fstatat` — the
+  `*at()` family beyond the `openat` already shipped in
+  v1.0. Cheap wrappers once a consumer needs them.
 - `access`, `faccessat` — permission checks. Skipped for now
   since `open` + errno is more informative.
 - `dup`, `dup2`, `pipe` — fd-graph manipulation. Useful for
@@ -278,6 +310,12 @@ sit on top of one or more syscall wrappers. Currently:
   result in a caller-supplied `long*`. Removes the need for
   callers to know that `ST_SIZE_OFF` is `96` on macOS and
   `48` on Linux.
+- [`dir_iter_*`](util/dir-iter.asm) — a portable directory
+  iterator built on `getdents`. Hides the per-platform
+  `d_type` (macOS `+20`, Linux `+18`) and `d_name` (macOS
+  `+21`, Linux `+19`) offsets behind an
+  `open`/`next`/`close` triple whose state lives in a
+  caller-allocated opaque block.
 
 Future helpers that compose a common file-I/O pattern into
 one call belong here rather than in `syscall/`.

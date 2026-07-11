@@ -55,6 +55,14 @@
 ;   b  unlink(SYMLINK_PATH)                         → 0
 ;   c  unlink(TMPFILE_V13)                          → 0
 ;
+; v1.4 directory iteration (ITER_DIR is a fresh mktemp'd dir
+; pre-populated by run.sh with three regular files):
+;   d  dir_iter_open(iter, ITER_DIR)                → 0
+;   e  loop dir_iter_next until 0; count           == 5
+;      (".", "..", "a", "b", "c" — exact contents
+;       written into the fixture by run.sh)
+;   f  dir_iter_close(iter)                         → 0
+;
 ; TMPFILE is a path the harness generates via mktemp and injects
 ; via `-DTMPFILE="..."`; run.sh removes it after the test.
 ;
@@ -76,6 +84,9 @@
 %endif
 %ifndef SYMLINK_PATH
 %define SYMLINK_PATH "/tmp/libio-smoke-symlink-default"
+%endif
+%ifndef ITER_DIR
+%define ITER_DIR "/tmp/libio-smoke-iter-default"
 %endif
 
 ; Pull in libio's syscall.inc for STATBUF_SIZE and ST_SIZE_OFF —
@@ -129,6 +140,7 @@ extern fstat, unlink, mkdir, rmdir
 extern stat, rename
 extern lstat, chmod, chown, symlink, readlink, truncate, ftruncate
 extern io_size
+extern dir_iter_open, dir_iter_next, dir_iter_close
 
 global _start
 global _main
@@ -139,6 +151,7 @@ dirpath:      db DIRPATH, 0
 renamed_path: db RENAMED_PATH, 0
 tmpfile_v13:  db TMPFILE_V13, 0
 symlink_path: db SYMLINK_PATH, 0
+iter_dir:     db ITER_DIR, 0
 hello:        db "hello"
 world:        db "world"
 tenbytes:     db "abcdefghij"
@@ -160,6 +173,9 @@ buf:      resb 32
 statbuf:  resb STATBUF_SIZE                ; 144 on both platforms
 size_out: resq 1                            ; scratch for io_size
 linkbuf:  resb 128                          ; scratch for readlink
+iter:     resb DIR_ITER_SIZE                ; opaque dir_iter state
+name_buf: resb 256                          ; scratch for dir_iter_next
+type_out: resb 1                            ; DT_* out slot
 
 section .text
 
@@ -528,6 +544,43 @@ _main:
     mov byte [fail_id], 'c'
     lea rdi, [tmpfile_v13]
     call unlink
+    test rax, rax
+    jnz .fail
+
+    ; ---- d: dir_iter_open(iter, ITER_DIR) → 0 ----
+    mov byte [fail_id], 'd'
+    lea rdi, [iter]
+    lea rsi, [iter_dir]
+    call dir_iter_open
+    test rax, rax
+    jnz .fail
+
+    ; ---- e: loop dir_iter_next until 0; count == 5 ----
+    ; The harness populates ITER_DIR with three regular files
+    ; (a, b, c), so iteration returns ".", "..", "a", "b", "c"
+    ; — exactly five entries. rbx is a caller-saved scratch
+    ; here because dir_iter_next never modifies it via ABI.
+    mov byte [fail_id], 'e'
+    xor ebx, ebx                     ; count = 0
+.iter_loop:
+    lea rdi, [iter]
+    lea rsi, [name_buf]
+    mov edx, 256
+    lea rcx, [type_out]
+    call dir_iter_next
+    test rax, rax
+    jz .iter_done                    ; 0 = end of directory
+    js .fail                         ; -errno
+    inc ebx                          ; had entry
+    jmp .iter_loop
+.iter_done:
+    cmp ebx, 5
+    jne .fail
+
+    ; ---- f: dir_iter_close(iter) → 0 ----
+    mov byte [fail_id], 'f'
+    lea rdi, [iter]
+    call dir_iter_close
     test rax, rax
     jnz .fail
 
