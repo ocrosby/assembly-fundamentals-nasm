@@ -90,6 +90,7 @@ jobs:
             [25-open-socket]=0
             [26-bind-socket]=0
             [27-listen-socket]=0
+            [28-fork-child]=42
           )
           # Examples that read from stdin get an empty pipe so they hit
           # EOF immediately and exit 0 without waiting for a TTY.
