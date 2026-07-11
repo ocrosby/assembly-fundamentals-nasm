@@ -51,6 +51,7 @@ cleanup() {
         resolvconf-smoke resolvconf-smoke.o \
         hostname-smoke hostname-smoke.o \
         v12-smoke v12-smoke.o \
+        v16-smoke v16-smoke.o \
         fail-smoke fail-smoke.o c-smoke
 }
 trap cleanup EXIT
@@ -194,6 +195,46 @@ else
         printf "PASS: %-12s output=[%s]\n" "v12-smoke" "$v12_out"
     else
         printf "FAIL: %-12s exit=%d output=[%s]\n" "v12-smoke" "$v12_code" "$v12_out"
+        fail_total=$((fail_total + 1))
+    fi
+fi
+
+# ---------------------------------------------------------------
+# v16-smoke — TC=1 → TCP fallback. Needs its own mock on a
+# fresh ephemeral port; the previous mocks have already exited.
+# ---------------------------------------------------------------
+portfile3="$tmp/port3v16"
+python3 mock-dns.py "$portfile3" &
+srv=$!
+
+port3=""
+for _ in $(seq 1 100); do
+    if [ -f "$portfile3" ]; then
+        port3="$(cat "$portfile3")"
+        break
+    fi
+    sleep 0.05
+done
+if [ -z "$port3" ]; then
+    printf "FAIL: %-12s (mock did not publish a port within ~5s)\n" "v16-smoke"
+    fail_total=$((fail_total + 1))
+else
+    # shellcheck disable=SC2086
+    nasm $nasm_fmt -DDNS_PORT="$port3" v16-smoke.asm -o v16-smoke.o
+    "${ld_cmd[@]}" v16-smoke.o "${libs[@]}" -o v16-smoke
+
+    set +e
+    v16_out="$(./v16-smoke 2>&1)"
+    v16_code=$?
+    set -e
+
+    wait "$srv" 2>/dev/null || true
+    srv=""
+
+    if [ "$v16_code" -eq 0 ]; then
+        printf "PASS: %-12s output=[%s]\n" "v16-smoke" "$v16_out"
+    else
+        printf "FAIL: %-12s exit=%d output=[%s]\n" "v16-smoke" "$v16_code" "$v16_out"
         fail_total=$((fail_total + 1))
     fi
 fi
