@@ -72,6 +72,7 @@ cleanup() {
           io-smoke io-smoke.o \
           fail-smoke fail-smoke.o \
           fdgraph-smoke fdgraph-smoke.o \
+          fcntl-smoke fcntl-smoke.o \
           c-smoke /tmp/libio-c-smoke.tmp /tmp/libio-c-smoke.tmp2 \
                   /tmp/libio-c-smoke.link
     rm -rf "$dirpath" "$iter_dir" "$at_dir" \
@@ -145,6 +146,31 @@ if [ "$fdg_code" -eq 0 ]; then
     printf "PASS: %-12s output=[%s]\n" "fdgraph-smoke" "$fdg_out"
 else
     printf "FAIL: %-12s exit=%d output=[%s]\n" "fdgraph-smoke" "$fdg_code" "$fdg_out"
+    fail_total=$((fail_total + 1))
+fi
+
+# ---------------------------------------------------------------
+# fcntl-smoke — v1.8 fcntl + flock. Needs the shared syscall.inc
+# for F_* / O_NONBLOCK / LOCK_* constants and its own mktemp'd
+# lock file.
+# ---------------------------------------------------------------
+lockfile="$(mktemp -u /tmp/libio-fcntl-smoke.XXXXXX)"
+# shellcheck disable=SC2086
+nasm $nasm_fmt -I../syscall/ \
+    -DTMPFILE_LOCK="\"$lockfile\"" \
+    fcntl-smoke.asm -o fcntl-smoke.o
+"${ld_cmd[@]}" fcntl-smoke.o "${libs[@]}" -o fcntl-smoke
+
+set +e
+fcn_out="$(./fcntl-smoke 2>&1)"
+fcn_code=$?
+set -e
+rm -f "$lockfile"
+
+if [ "$fcn_code" -eq 0 ]; then
+    printf "PASS: %-12s output=[%s]\n" "fcntl-smoke" "$fcn_out"
+else
+    printf "FAIL: %-12s exit=%d output=[%s]\n" "fcntl-smoke" "$fcn_code" "$fcn_out"
     fail_total=$((fail_total + 1))
 fi
 

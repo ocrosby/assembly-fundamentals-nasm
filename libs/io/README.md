@@ -98,6 +98,37 @@ follows.
 | `dup2` | `oldfd`, `newfd`      | `newfd` or negative errno            |
 | `pipe` | `pipefd*` (int[2])    | `0` or negative errno; writes both fds into the array |
 
+**v1.8 — fd flags + advisory locks:**
+
+| Symbol  | Arguments             | Returns                                        |
+| ------- | --------------------- | ---------------------------------------------- |
+| `fcntl` | `fd`, `cmd`, `arg`    | command-specific value or negative errno       |
+| `flock` | `fd`, `operation`     | `0` or negative errno                          |
+
+`fcntl` is a pass-through wrapper — its return value depends on
+the command:
+
+- `F_GETFD`, `F_GETFL` — return the flags value
+- `F_SETFD`, `F_SETFL` — return `0` on success
+- `F_DUPFD` — return a new fd
+
+The most common patterns callers reach for are round-tripping
+`F_GETFL` → `F_SETFL` with the `O_NONBLOCK` bit toggled (making
+a socket or pipe non-blocking) and setting `FD_CLOEXEC` via
+`F_SETFD` so the fd doesn't survive `execve`. `syscall.inc`
+exports both the `F_*` command codes and the `O_NONBLOCK` /
+`O_APPEND` bits (whose numeric values differ per platform).
+
+`flock` is BSD advisory locking. Values agree across macOS and
+Linux, `LOCK_SH` / `LOCK_EX` / `LOCK_UN` for shared / exclusive
+/ unlock, `LOCK_NB` OR'd in to make the call non-blocking
+(return `-EWOULDBLOCK` instead of waiting). The lock is
+associated with the open file description, so `dup` and `fork`
+share it, but two independent `open` calls to the same file get
+independent locks. Not portable across NFS — use `fcntl` POSIX
+locking (`F_SETLK`, deferred here) if the file may live on a
+network filesystem.
+
 `dup` and `dup2` are one-liner syscall wrappers — Darwin and
 Linux agree on the calling convention. `pipe` is the outlier:
 its Linux syscall writes both fds into the caller-supplied
@@ -310,6 +341,7 @@ extern unlinkat, mkdirat, renameat, fstatat     ; v1.5
 extern symlinkat, linkat, readlinkat            ; v1.5
 extern fchmodat, fchownat                       ; v1.6
 extern dup, dup2, pipe                          ; v1.7
+extern fcntl, flock                             ; v1.8
 extern io_size                                  ; v1.1 util helper
 extern dir_iter_open, dir_iter_next             ; v1.4 util
 extern dir_iter_close                           ; v1.4 util
@@ -341,7 +373,7 @@ run `make -C ../../libs/io` first.
 make test
 ```
 
-`make test` builds `libio.a` and runs four smoke tests via the
+`make test` builds `libio.a` and runs five smoke tests via the
 harness in [`test/`](test/):
 
 - [`io-smoke.asm`](test/io-smoke.asm) — success path. Sub-checks
@@ -383,6 +415,14 @@ harness in [`test/`](test/):
   `dup(BAD_FD)` returns negative. Lives in a separate file
   because `io-smoke` has exhausted its single-character
   sub-check ID space (`1..9`, `A..Z`, `a..y`).
+- [`fcntl-smoke.asm`](test/fcntl-smoke.asm) — v1.8's `fcntl`
+  and `flock`. Twelve sub-checks: pipe fixture → `F_GETFL`
+  reads the current flags → `F_SETFL` sets `O_NONBLOCK` →
+  `F_GETFL` confirms the bit → a raw read on the empty pipe
+  returns `-EAGAIN` (proves the flag reached the kernel) →
+  `F_SETFD` sets `FD_CLOEXEC` → `F_GETFD` confirms → open a
+  scratch tempfile → `flock(LOCK_EX|LOCK_NB)` and
+  `flock(LOCK_UN)` succeed → close and unlink.
 - [`c-smoke.c`](test/c-smoke.c) — verifies `libio.a` is linkable
   and callable from a normal C toolchain. Uses GCC `__asm__`
   labels to bind libio calls to their bare names (bypassing
@@ -396,6 +436,7 @@ On success the runner prints one line per test:
 PASS: io-smoke     output=[PASS]
 PASS: fail-smoke   output=[PASS]
 PASS: fdgraph-smoke output=[PASS]
+PASS: fcntl-smoke  output=[PASS]
 PASS: c-smoke      output=[PASS]
 ```
 
@@ -403,8 +444,9 @@ Both platforms are exercised on CI.
 
 ## What is not here — yet
 
-v1.7 covers fd-graph manipulation (`dup`, `dup2`, `pipe`) on
-top of the v1.6 permissions surface. Still deferred:
+v1.8 covers fd-flag mutation (`fcntl` for `F_SETFL O_NONBLOCK`,
+`F_SETFD FD_CLOEXEC`, etc.) and BSD advisory locking (`flock`)
+on top of v1.7's fd-graph surface. Still deferred:
 
 - `utimensat` — see the v1.6 symbol section for the reason.
   Would require a per-platform helper on macOS (dispatching
@@ -412,11 +454,11 @@ top of the v1.6 permissions surface. Still deferred:
   is just `SYS_utimensat`. Add if a real consumer needs it.
 - `access`, `faccessat` — permission checks. Skipped for now
   since `open` + errno is more informative.
-- `flock`, `fcntl` — advisory locking / fd flag mutation.
-  Both have large flag surfaces; deferred until a real
-  consumer justifies picking a subset. (`fcntl` is where
-  `F_SETFL O_NONBLOCK` and `F_SETFD FD_CLOEXEC` live — a
-  real target for a follow-up subversion.)
+- `fcntl` POSIX locking (`F_SETLK`, `F_SETLKW`, `F_GETLK`).
+  These need a `struct flock` argument whose layout differs
+  between macOS and Linux; would want an `io_lock_*` helper
+  in `util/` that hides the marshalling. `flock` covers the
+  simpler advisory-lock case for now.
 - Async I/O and event notification (`kqueue`, `epoll`,
   `io_uring`). Each is a full archive on its own.
 - `pipe2` (Linux) — the flag-taking variant. libsock's
