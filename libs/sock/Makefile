@@ -11,6 +11,17 @@ SRCS := \
     shutdown.asm \
     close.asm
 
+# I/O.
+SRCS += \
+    read.asm \
+    write.asm \
+    send.asm \
+    recv.asm \
+    sendto.asm \
+    recvfrom.asm \
+    sendmsg.asm \
+    recvmsg.asm
+
 OBJS := $(SRCS:.asm=.o)
 
 UNAME_S := $(shell uname -s)
