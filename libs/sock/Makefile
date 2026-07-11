@@ -1,8 +1,9 @@
-NAME    := tcp
+NAME    := sock
 ARCHIVE := lib$(NAME).a
 
-SRCS    := tcp-connect.asm tcp-send.asm tcp-recv.asm tcp-close.asm
-OBJS    := $(SRCS:.asm=.o)
+SRCS :=
+
+OBJS := $(SRCS:.asm=.o)
 
 UNAME_S := $(shell uname -s)
 ifeq ($(UNAME_S),Darwin)
@@ -20,7 +21,9 @@ build: $(OBJS)
 $(ARCHIVE): $(OBJS)
 	ar rcs $(ARCHIVE) $(OBJS)
 
-%.o: %.asm
+# Every wrapper %include's syscall.inc, so rebuild all .o files
+# when the shared header changes.
+%.o: %.asm syscall.inc
 	nasm $(NASM_FLAGS) $< -o $@
 
 # Smoke-test the socket path end to end: build this archive and
