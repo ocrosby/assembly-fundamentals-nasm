@@ -35,6 +35,13 @@ SRCS += \
     select.asm \
     poll.asm
 
+# Byte-order helpers.
+SRCS += \
+    htons.asm \
+    htonl.asm \
+    ntohs.asm \
+    ntohl.asm
+
 OBJS := $(SRCS:.asm=.o)
 
 UNAME_S := $(shell uname -s)
