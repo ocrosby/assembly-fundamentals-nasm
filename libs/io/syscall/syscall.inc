@@ -89,6 +89,9 @@
 %define SYS_dup        0x2000029
 %define SYS_dup2       0x200005a
 %define SYS_pipe       0x200002a
+; v1.8 additions — fd flags + advisory locks.
+%define SYS_fcntl      0x200005c
+%define SYS_flock      0x2000083
 %else
 %define SYS_open   2
 %define SYS_lseek  8
@@ -136,6 +139,9 @@
 %define SYS_dup        32
 %define SYS_dup2       33
 %define SYS_pipe       22
+; v1.8 additions.
+%define SYS_fcntl      72
+%define SYS_flock      73
 %endif
 
 ; The stat struct is 144 bytes on both macOS (`struct stat64`)
@@ -253,6 +259,50 @@
 %define AT_SYMLINK_NOFOLLOW    0x100
 %define AT_REMOVEDIR           0x200
 %endif
+
+; -----------------------------------------------------------------
+; v1.8: fcntl commands and flag values.
+;
+; F_* command codes agree across macOS and Linux (they descend
+; from the same BSD ancestor). fcntl's return value depends on
+; the command:
+;
+;   F_GETFD, F_GETFL        return the flags value (non-negative)
+;   F_SETFD, F_SETFL        return 0
+;   F_DUPFD                 return a new fd
+;
+; libio's fcntl wrapper is a pass-through — the caller interprets
+; rax based on the command.
+%define F_DUPFD                 0
+%define F_GETFD                 1
+%define F_SETFD                 2
+%define F_GETFL                 3
+%define F_SETFL                 4
+
+; Only one file-descriptor flag exists on both platforms (the
+; close-on-exec bit). Set via F_SETFD.
+%define FD_CLOEXEC              1
+
+; File status flags (F_GETFL / F_SETFL). O_RDONLY / O_WRONLY /
+; O_RDWR (2 low bits) agree, but everything above them diverges
+; between platforms. O_NONBLOCK and O_APPEND are the two most
+; useful for fcntl-driven flag mutation; add more as consumers
+; need them.
+%ifdef MACOS
+%define O_NONBLOCK              0x0004
+%define O_APPEND                0x0008
+%else
+%define O_NONBLOCK              0x800
+%define O_APPEND                0x400
+%endif
+
+; flock operations. Values agree across macOS and Linux; LOCK_NB
+; is OR'd into LOCK_SH or LOCK_EX to make the call non-blocking
+; (return -EWOULDBLOCK instead of waiting).
+%define LOCK_SH                 1
+%define LOCK_EX                 2
+%define LOCK_NB                 4
+%define LOCK_UN                 8
 
 %macro SYSCALL_NORM 0
     syscall

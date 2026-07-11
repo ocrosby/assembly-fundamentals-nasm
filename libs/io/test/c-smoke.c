@@ -117,6 +117,24 @@ extern int  dup       (int oldfd)                                               
 extern int  dup2      (int oldfd, int newfd)                                                     __asm__("dup2");
 extern int  pipe      (int *pipefd)                                                              __asm__("pipe");
 
+/* v1.8: fd flags + advisory locks. */
+extern int  fcntl     (int fd, int cmd, int arg)                                                 __asm__("fcntl");
+extern int  flock     (int fd, int op)                                                           __asm__("flock");
+
+#define F_GETFL 3
+#define F_SETFL 4
+#define F_GETFD 1
+#define F_SETFD 2
+#define FD_CLOEXEC 1
+#ifdef __APPLE__
+#  define O_NONBLOCK 0x0004
+#else
+#  define O_NONBLOCK 0x800
+#endif
+#define LOCK_EX 2
+#define LOCK_UN 8
+#define LOCK_NB 4
+
 /* close still lives in libsock, not libio. Fall through to libc's
  * default so we don't pull libsock in for one syscall. */
 extern int close(int fd);
@@ -335,6 +353,36 @@ int main(void) {
 
     /* Bad fd → negative errno. */
     if (dup(999999) >= 0)                           return fail(75);
+
+    /* v1.8: fcntl round-trip + flock. */
+    {
+        int pfd2[2];
+        if (pipe(pfd2) != 0)                        return fail(76);
+        int fl = fcntl(pfd2[0], F_GETFL, 0);
+        if (fl < 0)                                 return fail(77);
+        if (fcntl(pfd2[0], F_SETFL, fl | O_NONBLOCK) != 0) return fail(78);
+        int fl2 = fcntl(pfd2[0], F_GETFL, 0);
+        if (fl2 < 0 || (fl2 & O_NONBLOCK) == 0)     return fail(79);
+        if (fcntl(pfd2[0], F_SETFD, FD_CLOEXEC) != 0) return fail(80);
+        int fd_fl = fcntl(pfd2[0], F_GETFD, 0);
+        if (fd_fl < 0 || (fd_fl & FD_CLOEXEC) == 0) return fail(81);
+        close(pfd2[0]); close(pfd2[1]);
+    }
+
+    /* flock on a scratch tempfile. */
+    {
+        const char *lk = "/tmp/libio-c-smoke.lock";
+        unlink(lk);
+        int f = open(lk, O_RDWR | O_CREAT, 0644);
+        if (f < 0)                                  return fail(82);
+        if (flock(f, LOCK_EX | LOCK_NB) != 0)       return fail(83);
+        if (flock(f, LOCK_UN) != 0)                 return fail(84);
+        close(f);
+        unlink(lk);
+    }
+
+    /* fcntl on BAD_FD → negative errno. */
+    if (fcntl(999999, F_GETFL, 0) >= 0)             return fail(85);
 
     puts("PASS");
     return 0;

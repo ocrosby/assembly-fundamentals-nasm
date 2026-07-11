@@ -22,6 +22,7 @@ libs/sock/test/c-smoke
 libs/io/test/io-smoke
 libs/io/test/fail-smoke
 libs/io/test/fdgraph-smoke
+libs/io/test/fcntl-smoke
 libs/io/test/c-smoke
 libs/resolv/test/resolv-smoke
 libs/resolv/test/v12-smoke
