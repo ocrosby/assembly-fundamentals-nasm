@@ -19,6 +19,9 @@ libs/sock/test/c-smoke
 libs/io/test/io-smoke
 libs/io/test/fail-smoke
 libs/io/test/c-smoke
+libs/resolv/test/resolv-smoke
+libs/resolv/test/fail-smoke
+libs/resolv/test/c-smoke
 
 # Built example binaries. Ignore everything inside a numbered example
 # directory, then un-ignore the source files we actually want tracked.
