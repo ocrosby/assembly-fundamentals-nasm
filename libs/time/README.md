@@ -16,6 +16,18 @@ convention, and no-libc policy every archive under `libs/` follows.
 
 ## Version
 
+**v1.4** — third `util/` helper: `monotonic_ms()`, a
+deliberately asymmetric wrapper. Linux gets real
+`clock_gettime(CLOCK_MONOTONIC, ...)` monotonic milliseconds;
+macOS gets an honest `-ENOSYS` because the raw-syscall path
+to Darwin's monotonic clock is closed off (see
+"Not here yet" for the full story). This is the exception
+to the archive's "same shape on both platforms or not
+shipped" discipline — the return convention stays uniform
+(`rax >= 0` success, negative errno failure), and the
+failure code lets callers detect unavailability and fall
+back to whatever suits them.
+
 **v1.3** — second `util/` helper: `now_ms()`, the "give me
 wall-clock time as a single 64-bit integer" call. Wraps
 `gettimeofday` + `tv_sec * 1000 + tv_usec / 1000` into one
@@ -49,6 +61,7 @@ left Darwin's 3rd syscall argument uninitialized (see below).
 | ---------------- | --------------------------------------------- | ----------------------------------------------------------- |
 | `time_diff_us`   | `late*`, `early*` (both `struct timeval*`)    | Signed microsecond delta (`late - early`). Negative sentinels reversed args. |
 | `now_ms`         | (none)                                        | Wall-clock milliseconds since Unix epoch (signed 64-bit), or negative errno if `gettimeofday` failed. |
+| `monotonic_ms`   | (none)                                        | **Linux only**: monotonic milliseconds since some kernel-chosen origin (signed 64-bit). **macOS**: always returns `-ENOSYS` (`-78`). |
 
 `gettimeofday` writes the current wall clock to `*tv` as a
 `struct timeval { time_t tv_sec; suseconds_t tv_usec; }` at
@@ -91,6 +104,24 @@ precision is milliseconds derived from `gettimeofday`'s
 microseconds. Wall-clock caveats apply — NTP jumps, DST
 transitions, manual admin adjustments. For elapsed-time
 measurements pin two calls close together and subtract.
+
+`monotonic_ms` is the archive's only intentionally
+asymmetric symbol. On Linux the body issues
+`clock_gettime(CLOCK_MONOTONIC, &ts)` via `SYS 228` and
+returns `ts.tv_sec * 1000 + ts.tv_nsec / 1_000_000`. On
+macOS the body immediately returns `-78` (`-ENOSYS`) —
+Darwin's raw-syscall path to monotonic time is closed
+(`SYS_clock_gettime_nsec_np` at 462 returns `-1` from
+userspace on Darwin 25+), and the mach trap for
+`mach_absolute_time` returns a value in an unstable
+undocumented unit. The commpage and libSystem paths are
+banned by the archive's no-libc policy. A wrapper that
+silently returned `gettimeofday`-derived milliseconds on
+macOS would be lying about monotonicity; this file refuses
+to lie. Callers who need best-effort monotonic time on
+macOS check for `-ENOSYS` and fall back to `now_ms`
+themselves, with the understanding that they are getting
+a wall clock, not a monotonic one.
 
 ## Darwin gettimeofday 3-arg fix
 
