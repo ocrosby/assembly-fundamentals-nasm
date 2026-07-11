@@ -71,6 +71,16 @@ extern int  io_size(int fd, long *out)                                     __asm
 extern int  stat  (const char *path, void *statbuf)                        __asm__("stat");
 extern int  rename(const char *oldpath, const char *newpath)               __asm__("rename");
 
+/* v1.3: permission, symlink, truncation. chown -1 (all-ones u32)
+ * is "keep existing" — safe for a non-root smoke test. */
+extern int  lstat    (const char *path, void *statbuf)                     __asm__("lstat");
+extern int  chmod    (const char *path, unsigned mode)                     __asm__("chmod");
+extern int  chown    (const char *path, unsigned uid, unsigned gid)        __asm__("chown");
+extern int  symlink  (const char *target, const char *linkpath)            __asm__("symlink");
+extern long readlink (const char *path, void *buf, unsigned long bufsize)  __asm__("readlink");
+extern int  truncate (const char *path, long length)                       __asm__("truncate");
+extern int  ftruncate(int fd, long length)                                 __asm__("ftruncate");
+
 /* close still lives in libsock, not libio. Fall through to libc's
  * default so we don't pull libsock in for one syscall. */
 extern int close(int fd);
@@ -161,6 +171,33 @@ int main(void) {
     /* 27: stat on the new path succeeds. */
     if (stat(p2, statbuf) != 0)                     return fail(27);
 
+    /* v1.3: chain a fresh file through truncate/chmod/chown/
+     * symlink/readlink/lstat/ftruncate. */
+    fd = open(p2, O_RDWR, 0);
+    if (fd < 0)                                     return fail(28);
+    if (pwrite(fd, "abcdefghij", 10, 0) != 10)      return fail(29);
+    if (ftruncate(fd, 5) != 0)                      return fail(30);
+    long ftsz;
+    if (io_size(fd, &ftsz) != 0 || ftsz != 5)       return fail(31);
+    if (close(fd) != 0)                             return fail(32);
+
+    if (truncate(p2, 3) != 0)                       return fail(33);
+    if (io_size((fd = open(p2, O_RDONLY, 0)), &ftsz) != 0
+        || ftsz != 3)                               return fail(34);
+    if (close(fd) != 0)                             return fail(35);
+
+    if (chmod(p2, 0644) != 0)                       return fail(36);
+    if (chown(p2, (unsigned)-1, (unsigned)-1) != 0) return fail(37);
+
+    const char *lnk = "/tmp/libio-c-smoke.link";
+    unlink(lnk);
+    if (symlink(p2, lnk) != 0)                      return fail(38);
+    char lbuf[128] = {0};
+    long ln = readlink(lnk, lbuf, sizeof lbuf);
+    if (ln <= 0)                                    return fail(39);
+    if (lstat(lnk, statbuf) != 0)                   return fail(40);
+
+    unlink(lnk);
     unlink(p2);
 
     puts("PASS");

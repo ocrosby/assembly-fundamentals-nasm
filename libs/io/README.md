@@ -50,6 +50,40 @@ follows.
 | `stat`   | `path`, `statbuf*`               | `0` or negative errno         |
 | `rename` | `oldpath`, `newpath`             | `0` or negative errno         |
 
+**v1.3 — permission, symlink, truncation:**
+
+| Symbol      | Arguments                      | Returns                              |
+| ----------- | ------------------------------ | ------------------------------------ |
+| `lstat`     | `path`, `statbuf*`             | `0` or negative errno                |
+| `chmod`     | `path`, `mode`                 | `0` or negative errno                |
+| `chown`     | `path`, `uid`, `gid`           | `0` or negative errno                |
+| `symlink`   | `target`, `linkpath`           | `0` or negative errno                |
+| `readlink`  | `path`, `buf*`, `bufsize`      | bytes copied or negative errno       |
+| `truncate`  | `path`, `length`               | `0` or negative errno                |
+| `ftruncate` | `fd`, `length`                 | `0` or negative errno                |
+
+`lstat` is `stat`'s "don't follow the terminal symlink"
+variant. The struct layout matches `stat` / `fstat` — same
+`ST_SIZE_OFF` etc. — so a caller that already knows the
+constants can plug `lstat` in without any other change.
+
+`chown` accepts `-1` (all-ones `u32`) for either `uid` or
+`gid` as "keep existing". `chown(path, -1, -1)` is therefore
+a safe no-op that non-root callers can use to smoke-test the
+wrapper.
+
+`readlink` writes into a caller-supplied buffer WITHOUT
+NUL-terminating it. Callers that want a C-string must
+compare the return value against the buffer size (values
+equal to `bufsize` mean the target was truncated) and write
+their own terminator.
+
+`truncate` and `ftruncate` are the same operation with
+different argument shapes — one takes a path, one takes an
+open fd. Both extend a shorter file with zeros and shrink a
+longer one, without adjusting the file position of any
+process that has the file open.
+
 `stat` is the path-based counterpart to `fstat` — it writes
 the same 144-byte struct, with the same offsets, but resolves
 its target by name instead of by open fd. Follows symbolic
@@ -139,9 +173,11 @@ In the consumer's `.asm`:
 
 ```nasm
 extern open, openat, lseek, pread, pwrite
-extern fstat, unlink, mkdir, rmdir      ; v1.1
-extern stat, rename                     ; v1.2
-extern io_size                          ; v1.1 (util helper)
+extern fstat, unlink, mkdir, rmdir              ; v1.1
+extern stat, rename                             ; v1.2
+extern lstat, chmod, chown, symlink, readlink   ; v1.3
+extern truncate, ftruncate                      ; v1.3
+extern io_size                                  ; v1.1 (util helper)
 ```
 
 In the consumer's `Makefile`, append the archive to the link
@@ -174,29 +210,28 @@ make test
 harness in [`test/`](test/):
 
 - [`io-smoke.asm`](test/io-smoke.asm) — success path. Sub-checks
-  `1..C` cover the v1.0 five wrappers on a real mktemp'd file
-  (pwrite two halves, lseek `SEEK_END` for size, pread across
-  the seam, openat + pread the tail). Sub-checks `D..I` cover
-  v1.1's metadata + namespace ops (fstat/io_size verify size,
-  mkdir/rmdir round-trip a scratch dir). Sub-checks `J..O`
-  cover v1.2: `stat` on the tempfile reads size `10`, `rename`
-  moves it to a fresh path, `stat` confirms the source is gone
-  and the destination inherits the size, then `unlink`
-  succeeds once and fails `-ENOENT` on the repeat.
+  `1..C` cover v1.0's five wrappers on a real mktemp'd file.
+  `D..I` cover v1.1's metadata + namespace ops. `J..O` cover
+  v1.2's `stat` + `rename`. `P..c` chain a fresh tempfile
+  through v1.3: `ftruncate` shrinks it, `io_size` verifies,
+  path-based `truncate` shrinks it again and `stat` verifies,
+  `chmod` + `chown(-1,-1)` succeed, `symlink` creates a link
+  and `readlink` reads it back, `lstat` inspects the link
+  itself, then both are unlinked.
 - [`fail-smoke.asm`](test/fail-smoke.asm) — failure path. Each
   wrapper is called with args the kernel is guaranteed to
   reject (`/proc/libio/does-not-exist-` → `-ENOENT` for
   `open`, `openat`, `unlink`, `mkdir`, `rmdir`, `stat`,
-  `rename`; `fd=999999` → `-EBADF` for `lseek`, `pread`,
-  `pwrite`, `fstat`). Exercises the macOS `SYSCALL_NORM`
-  `neg rax` line on every export.
+  `rename`, `lstat`, `chmod`, `chown`, `symlink`, `readlink`,
+  `truncate`; `fd=999999` → `-EBADF` for `lseek`, `pread`,
+  `pwrite`, `fstat`, `ftruncate`). Exercises the macOS
+  `SYSCALL_NORM` `neg rax` line on every export.
 - [`c-smoke.c`](test/c-smoke.c) — verifies `libio.a` is linkable
   and callable from a normal C toolchain. Uses GCC `__asm__`
   labels to bind libio calls to their bare names (bypassing
-  Mach-O's underscore convention). Exercises v1.1's `fstat`,
-  `io_size`, `unlink`, `mkdir`, `rmdir` and v1.2's `stat`,
-  `rename` end-to-end so a C consumer's link line is proven
-  to work for every export.
+  Mach-O's underscore convention). Exercises every exported
+  symbol end-to-end so a C consumer's link line is proven
+  to work.
 
 On success the runner prints one line per test:
 
@@ -210,21 +245,28 @@ Both platforms are exercised on CI.
 
 ## What is not here — yet
 
-v1.2 adds path-based `stat` and atomic `rename`. Still deferred:
+v1.3 fills in the remaining common single-syscall wrappers
+around POSIX files (`lstat`, `chmod`, `chown`, `symlink`,
+`readlink`, `truncate`, `ftruncate`). Still deferred:
 
-- `lstat` — like `stat` but does not follow terminal symlinks.
-  Trivial wrapper on top of the same struct layout; add it
-  when a consumer wants to distinguish symlinks from their
-  targets.
 - Directory iteration (`getdents64` on Linux, `getdirentries`
   on macOS). `struct dirent` layouts vary by platform and the
   syscall shape differs, so a portable helper is a larger
   design task.
-- `chmod`, `chown`, `symlink`, `readlink`, `truncate`,
-  `ftruncate` — no consumer needs them yet.
+- `link` (hard-link creation), `linkat`, `symlinkat`,
+  `renameat` — the `*at()` family beyond the `openat` already
+  shipped in v1.0. Cheap wrappers once a consumer needs
+  them.
+- `access`, `faccessat` — permission checks. Skipped for now
+  since `open` + errno is more informative.
 - `dup`, `dup2`, `pipe` — fd-graph manipulation. Useful for
   process plumbing but out of scope for the file-oriented
   archive.
+- `flock`, `fcntl` — advisory locking / fd flag mutation.
+  Both have large flag surfaces; deferred until a real
+  consumer justifies picking a subset.
+- Async I/O and event notification (`kqueue`, `epoll`,
+  `io_uring`). Each is a full archive on its own.
 
 ## Utility helpers
 
