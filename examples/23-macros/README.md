@@ -26,4 +26,7 @@ Expected: `Hello, world!` on stdout, `exit=42`.
 
 ## Next
 
-- Back to [examples/README.md](../README.md).
+- [24-static-link](../24-static-link/) — link an example against
+  a static archive built in this repo (`libs/asm/libasm.a`)
+  instead of a shared library. Sets up every later chapter to
+  depend on the `libs/` archives.
