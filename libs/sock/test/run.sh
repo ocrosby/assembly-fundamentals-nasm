@@ -86,6 +86,7 @@ run_standalone ipc-smoke
 run_standalone fail-smoke
 run_standalone bind-listen-smoke
 run_standalone client-connect-smoke
+run_standalone socket-timeout-smoke
 
 # ---------------------------------------------------------------
 # tcp-smoke — Python server, assembly client, coordinate via port

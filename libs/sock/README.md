@@ -82,12 +82,14 @@ emits the RFC 5952 canonical form. Buffer-size requirements are
 exact accepted grammar, rejection cases, and canonical-form
 rules.
 
-### Composed helpers (v1.1 / v1.2)
+### Composed helpers (v1.1 / v1.2 / v1.3)
 
-| Symbol               | Arguments                                                    | Returns                              |
-| -------------------- | ------------------------------------------------------------ | ------------------------------------ |
-| `server_bind_listen` | `ip_net` (u32 net order), `port_host` (u16), `backlog` (int) | fd or negative errno                 |
-| `client_connect`     | `ip_net` (u32 net order), `port_host` (u16)                  | fd or negative errno                 |
+| Symbol                 | Arguments                                                    | Returns                              |
+| ---------------------- | ------------------------------------------------------------ | ------------------------------------ |
+| `server_bind_listen`   | `ip_net` (u32 net order), `port_host` (u16), `backlog` (int) | fd or negative errno                 |
+| `client_connect`       | `ip_net` (u32 net order), `port_host` (u16)                  | fd or negative errno                 |
+| `set_recv_timeout_ms`  | `fd` (int), `ms` (u32)                                       | `0` or negative errno                |
+| `set_send_timeout_ms`  | `fd` (int), `ms` (u32)                                       | `0` or negative errno                |
 
 `server_bind_listen` composes the four syscalls that every TCP
 server always makes into one call: `socket(AF_INET,
@@ -111,6 +113,19 @@ contract — a `connect` that fails with `-ECONNREFUSED` /
 before the errno propagates. `connect` blocks until the TCP
 three-way handshake completes; if a bounded connect is
 required the caller sets the socket non-blocking themselves.
+
+`set_recv_timeout_ms` / `set_send_timeout_ms` hide the
+`struct timeval` marshalling behind a plain integer
+millisecond argument, calling `setsockopt(SO_RCVTIMEO)` or
+`setsockopt(SO_SNDTIMEO)` under the hood. When the timeout
+fires the next blocking `recv` / `send` (or `read` / `write`)
+returns `-EAGAIN` (`-35` macOS, `-11` Linux). Pass `ms = 0`
+for the "block indefinitely" contract — same as libc's
+`setsockopt` with `{tv_sec: 0, tv_usec: 0}`. To make the
+socket fully non-blocking (return immediately with
+`-EAGAIN` whenever it would block, without any wait), use
+`fcntl(F_SETFL, O_NONBLOCK)` instead — these timeouts only
+bound the blocking wait, not the polling shape.
 
 ## What is not here — DNS
 
@@ -189,9 +204,9 @@ run `make -C ../../libs/sock` first.
 make test                           # requires python3
 ```
 
-`make test` builds `libsock.a` and `libasm.a`, then runs nine
+`make test` builds `libsock.a` and `libasm.a`, then runs ten
 smoke tests in sequence via the harness in [`test/`](test/).
-Together they call every one of the 32 exported symbols on at
+Together they call every one of the 34 exported symbols on at
 least one success path; every syscall wrapper on at least one
 failure path (which is what actually exercises the macOS
 `SYSCALL_NORM` `neg rax` branch — the success paths never do);
@@ -243,6 +258,13 @@ regression case is sub-check `q` in `inet6-smoke`.
   additionally exercises the close-on-fail path by
   `client_connect`-ing to a dead port and asserting the
   return is negative.
+- [`socket-timeout-smoke.asm`](test/socket-timeout-smoke.asm)
+  — the v1.3 helpers. `socketpair(AF_UNIX, SOCK_STREAM)`
+  yields both ends in-process; `set_recv_timeout_ms` and
+  `set_send_timeout_ms` are then called with 100ms, 200ms,
+  and `0` (indefinite) values. Sub-check 5 hits the failure
+  path with `BAD_FD` to prove the wrappers propagate rather
+  than swallow the setsockopt errno.
 - [`tcp-smoke.asm`](test/tcp-smoke.asm) + `server.py` —
   end-to-end TCP client. Python loopback server on an ephemeral
   port; assembly client goes through `socket` / `connect` /
@@ -282,6 +304,7 @@ PASS: ipc-smoke      output=[PASS]
 PASS: fail-smoke     output=[PASS]
 PASS: bind-listen-smoke output=[PASS]
 PASS: client-connect-smoke output=[PASS]
+PASS: socket-timeout-smoke output=[PASS]
 PASS: tcp-smoke      output=[TCP-OK]
 PASS: server-smoke   output=[PORT:<n>]
 PASS: c-smoke        output=[PASS]
@@ -304,9 +327,11 @@ code actually works:
   `<arpa/inet.h>` (byte-order + IPv4/IPv6 text conversion). No
   kernel calls, no shared header.
 - [`util/`](util/) — composed helpers that string several
-  syscall wrappers together into a single call. Two entries
-  as of v1.2: `server_bind_listen` (v1.1) for the inbound
-  side and `client_connect` (v1.2) for the outbound side.
+  syscall wrappers together into a single call. Four entries
+  as of v1.3: `server_bind_listen` (v1.1) for the inbound
+  side, `client_connect` (v1.2) for the outbound side, and
+  `set_recv_timeout_ms` / `set_send_timeout_ms` (v1.3) for
+  bounding the blocking recv / send.
 
 Each exported symbol lives in a same-named file (`socket.asm`
 exports `socket`, `htons.asm` exports `htons`, and so on). The

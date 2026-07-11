@@ -124,11 +124,13 @@
 %define SO_REUSEADDR 0x0004
 %define SO_TYPE      0x1008
 %define SO_RCVTIMEO  0x1006
+%define SO_SNDTIMEO  0x1005
 %else
 %define SOL_SOCKET   1
 %define SO_REUSEADDR 2
 %define SO_TYPE      3
 %define SO_RCVTIMEO  20
+%define SO_SNDTIMEO  21
 %endif
 
 %endif ; SOCK_SYSCALL_INC
