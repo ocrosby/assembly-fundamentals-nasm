@@ -27,6 +27,7 @@
 ;   F readlink    — bad path  → -ENOENT         (v1.3)
 ;   G truncate    — bad path  → -ENOENT         (v1.3)
 ;   H ftruncate   — fd=999999 → -EBADF          (v1.3)
+;   I getdents    — fd=999999 → -EBADF          (v1.4)
 ;
 ; Prints "PASS\n" and exits 0 when every wrapper returned a
 ; negative value from its intentionally-broken call. Prints
@@ -56,6 +57,7 @@ extern open, openat, lseek, pread, pwrite
 extern fstat, unlink, mkdir, rmdir
 extern stat, rename
 extern lstat, chmod, chown, symlink, readlink, truncate, ftruncate
+extern getdents
 
 global _start
 global _main
@@ -211,6 +213,16 @@ _main:
     xor esi, esi
     call ftruncate
     EXPECT_NEGATIVE 'H'
+
+    ; I: getdents(BAD_FD, buf, 32, &scratch) -> -EBADF
+    mov edi, BAD_FD
+    lea rsi, [buf]
+    mov edx, 32
+    lea rcx, [buf]                   ; position out-slot; scratch
+                                     ; reuse — kernel writes are
+                                     ; short-circuited by EBADF
+    call getdents
+    EXPECT_NEGATIVE 'I'
 
     ; PASS
     mov rax, SYS_write

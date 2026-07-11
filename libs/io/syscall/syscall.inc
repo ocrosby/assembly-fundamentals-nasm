@@ -59,6 +59,10 @@
 %define SYS_readlink  0x200003a
 %define SYS_truncate  0x20000c8
 %define SYS_ftruncate 0x20000c9
+; v1.4: directory iteration. getdirentries64 (BSD 344) uses the
+; 64-bit-inode `struct dirent` layout that pairs with our stat64
+; wrapper — same wide inode field on both syscalls.
+%define SYS_getdents  0x2000158
 %else
 %define SYS_open   2
 %define SYS_lseek  8
@@ -83,6 +87,8 @@
 %define SYS_readlink  89
 %define SYS_truncate  76
 %define SYS_ftruncate 77
+; v1.4: directory iteration.
+%define SYS_getdents  217
 %endif
 
 ; The stat struct is 144 bytes on both macOS (`struct stat64`)
@@ -103,6 +109,80 @@
 ; st_uid(4) st_gid(4) pad(4) st_rdev(8) → st_size at +48.
 %define ST_SIZE_OFF  48
 %endif
+
+; -----------------------------------------------------------------
+; v1.4: dirent record layout for getdents-returned buffers.
+;
+; The kernel returns a stream of variable-length records. Both
+; platforms share the same u16 d_reclen at offset 16, and the
+; d_type byte + NUL-terminated d_name follow, but at different
+; offsets:
+;
+;   Linux linux_dirent64:
+;     +0  u64 d_ino
+;     +8  i64 d_off
+;     +16 u16 d_reclen
+;     +18 u8  d_type
+;     +19 char d_name[] (NUL-terminated, record-padded)
+;
+;   macOS struct dirent (64-bit-inode):
+;     +0  u64 d_ino
+;     +8  u64 d_seekoff
+;     +16 u16 d_reclen
+;     +18 u16 d_namlen
+;     +20 u8  d_type
+;     +21 char d_name[] (NUL-terminated, record-padded)
+;
+; util/dir-iter.asm walks these portably by reading d_reclen at
+; the shared offset and consulting D_TYPE_OFF / D_NAME_OFF for
+; the fields that differ.
+
+%define D_RECLEN_OFF  16
+%ifdef MACOS
+%define D_TYPE_OFF    20
+%define D_NAME_OFF    21
+%else
+%define D_TYPE_OFF    18
+%define D_NAME_OFF    19
+%endif
+
+; File-type constants for d_type. Both platforms use identical
+; values (drawn from BSD's <dirent.h> which POSIX later
+; standardized). DT_UNKNOWN is the sentinel filesystems return
+; when they cannot cheaply report the type — the caller must
+; fall back to stat/lstat to disambiguate.
+%define DT_UNKNOWN 0
+%define DT_FIFO    1
+%define DT_CHR     2
+%define DT_DIR     4
+%define DT_BLK     6
+%define DT_REG     8
+%define DT_LNK     10
+%define DT_SOCK    12
+
+; -----------------------------------------------------------------
+; v1.4: dir_iter caller-allocated iterator state.
+;
+;   [+0..7]     fd (u64; only low 32 used, upper zero)
+;   [+8..15]    position (in-out for macOS getdirentries64;
+;               ignored on Linux)
+;   [+16..23]   read_bytes (bytes returned by the most recent
+;               getdents refill)
+;   [+24..31]   cursor (bytes already consumed from the buffer)
+;   [+32..4127] buf (4096-byte scratch for the raw dirent
+;               records)
+;
+; Total 4128 bytes. Callers reserve `resb DIR_ITER_SIZE` in .bss
+; or `sub rsp, DIR_ITER_SIZE` on the stack; the iterator has no
+; heap dependency and its whole state travels in the caller's
+; frame.
+%define DIR_ITER_FD           0
+%define DIR_ITER_POSITION     8
+%define DIR_ITER_READ_BYTES   16
+%define DIR_ITER_CURSOR       24
+%define DIR_ITER_BUF          32
+%define DIR_ITER_BUF_SIZE     4096
+%define DIR_ITER_SIZE         4128
 
 %macro SYSCALL_NORM 0
     syscall

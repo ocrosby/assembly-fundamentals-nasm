@@ -51,6 +51,13 @@ rmdir "$dirpath"                       # H recreates it
 renamed_path="$(mktemp -u /tmp/libio-smoke.renamed.XXXXXX)"
 tmpfile_v13="$(mktemp -u /tmp/libio-smoke.v13.XXXXXX)"
 symlink_path="$(mktemp -u /tmp/libio-smoke.symlink.XXXXXX)"
+# v1.4: ITER_DIR is created + pre-populated with three flat
+# regular files so the smoke test's iterator counts exactly 5
+# entries (".", "..", "a", "b", "c").
+iter_dir="$(mktemp -d /tmp/libio-smoke.iter.XXXXXX)"
+: > "$iter_dir/a"
+: > "$iter_dir/b"
+: > "$iter_dir/c"
 cleanup() {
     # Sub-checks in io-smoke unlink each of the paths above on
     # the happy path (N: renamed_path, b: symlink_path, c:
@@ -61,7 +68,7 @@ cleanup() {
           fail-smoke fail-smoke.o \
           c-smoke /tmp/libio-c-smoke.tmp /tmp/libio-c-smoke.tmp2 \
                   /tmp/libio-c-smoke.link
-    rm -rf "$dirpath"
+    rm -rf "$dirpath" "$iter_dir" /tmp/libio-c-smoke.iter
 }
 trap cleanup EXIT
 
@@ -79,6 +86,7 @@ nasm $nasm_fmt -I../syscall/ \
     -DRENAMED_PATH="\"$renamed_path\"" \
     -DTMPFILE_V13="\"$tmpfile_v13\"" \
     -DSYMLINK_PATH="\"$symlink_path\"" \
+    -DITER_DIR="\"$iter_dir\"" \
     io-smoke.asm -o io-smoke.o
 "${ld_cmd[@]}" io-smoke.o "${libs[@]}" -o io-smoke
 

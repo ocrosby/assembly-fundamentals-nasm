@@ -81,6 +81,13 @@ extern long readlink (const char *path, void *buf, unsigned long bufsize)  __asm
 extern int  truncate (const char *path, long length)                       __asm__("truncate");
 extern int  ftruncate(int fd, long length)                                 __asm__("ftruncate");
 
+/* v1.4: portable directory iterator. `iter` is a caller-
+ * allocated 4128-byte opaque state block. */
+extern long dir_iter_open (void *iter, const char *path)                   __asm__("dir_iter_open");
+extern long dir_iter_next (void *iter, char *name_buf,
+                            unsigned long size, unsigned char *type_out)   __asm__("dir_iter_next");
+extern long dir_iter_close(void *iter)                                     __asm__("dir_iter_close");
+
 /* close still lives in libsock, not libio. Fall through to libc's
  * default so we don't pull libsock in for one syscall. */
 extern int close(int fd);
@@ -199,6 +206,45 @@ int main(void) {
 
     unlink(lnk);
     unlink(p2);
+
+    /* v1.4: create a fresh dir with two flat files, then iterate.
+     * Expect exactly 4 entries: ".", "..", "one", "two". */
+    const char *ird = "/tmp/libio-c-smoke.iter";
+    rmdir(ird);                                     /* best-effort */
+    if (mkdir(ird, 0755) != 0)                      return fail(41);
+    {
+        char one[64], two[64];
+        snprintf(one, sizeof one, "%s/one", ird);
+        snprintf(two, sizeof two, "%s/two", ird);
+        int f1 = open(one, O_RDWR | O_CREAT, 0600);
+        if (f1 < 0)                                 return fail(42);
+        close(f1);
+        int f2 = open(two, O_RDWR | O_CREAT, 0600);
+        if (f2 < 0)                                 return fail(43);
+        close(f2);
+
+        unsigned char iter[4128];
+        if (dir_iter_open(iter, ird) != 0)          return fail(44);
+        int count = 0;
+        int saw_one = 0, saw_two = 0;
+        for (;;) {
+            char name[256];
+            unsigned char type;
+            long r = dir_iter_next(iter, name, sizeof name, &type);
+            if (r == 0) break;                       /* end */
+            if (r < 0)                              return fail(45);
+            count++;
+            if (memcmp(name, "one", 4) == 0) saw_one = 1;
+            if (memcmp(name, "two", 4) == 0) saw_two = 1;
+        }
+        if (dir_iter_close(iter) != 0)              return fail(46);
+        if (count != 4)                             return fail(47);
+        if (!saw_one || !saw_two)                   return fail(48);
+
+        unlink(one);
+        unlink(two);
+        rmdir(ird);
+    }
 
     puts("PASS");
     return 0;
