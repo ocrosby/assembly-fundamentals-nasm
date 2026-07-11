@@ -28,11 +28,12 @@ typedef int pid_t_local;
 
 /* libproc symbols — __asm__ labels pin references to the bare
  * name NASM emits. */
-extern pid_t_local libproc_fork   (void)                                                __asm__("fork");
-extern pid_t_local libproc_wait4  (pid_t_local pid, int *wstatus, int options, void *ru) __asm__("wait4");
-extern pid_t_local libproc_getpid (void)                                                __asm__("getpid");
-extern pid_t_local libproc_getppid(void)                                                __asm__("getppid");
-extern int         libproc_kill   (pid_t_local pid, int sig)                            __asm__("kill");
+extern pid_t_local libproc_fork      (void)                                                __asm__("fork");
+extern pid_t_local libproc_wait4     (pid_t_local pid, int *wstatus, int options, void *ru) __asm__("wait4");
+extern pid_t_local libproc_getpid    (void)                                                __asm__("getpid");
+extern pid_t_local libproc_getppid   (void)                                                __asm__("getppid");
+extern int         libproc_kill      (pid_t_local pid, int sig)                            __asm__("kill");
+extern int         libproc_spawn_wait(const char *path, char *const *argv, char *const *envp) __asm__("spawn_wait");
 
 /* Raw _exit(n) — do not call libc's exit() from the child, we
  * do not want atexit handlers or stdio flushes running twice.
@@ -88,6 +89,18 @@ int main(void) {
     int rc = libproc_kill(child, 0);
     if (rc != -3) {
         fprintf(stderr, "kill(reaped, 0) returned %d (want -3 / -ESRCH)\n", rc);
+        return 1;
+    }
+
+    /* v1.1: spawn_wait("/usr/bin/true", ...) -> wstatus == 0.
+     * /usr/bin/true exists on both macOS (bare /bin has no
+     * `true`) and modern Linux under usrmerge.
+     */
+    char *argv[] = {"/usr/bin/true", NULL};
+    char *envp[] = {NULL};
+    int wstatus_spawn = libproc_spawn_wait("/usr/bin/true", argv, envp);
+    if (wstatus_spawn != 0) {
+        fprintf(stderr, "spawn_wait returned 0x%x (want 0)\n", wstatus_spawn);
         return 1;
     }
 

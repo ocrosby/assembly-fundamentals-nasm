@@ -2,11 +2,12 @@ NAME    := proc
 ARCHIVE := lib$(NAME).a
 
 # syscall/ holds the direct kernel-syscall wrappers plus their
-# shared syscall.inc header. util/ (future) will hold composed
-# helpers — for example, spawn_wait(argv) combining fork +
-# execve + wait4 into a single call.
+# shared syscall.inc header. util/ holds composed helpers —
+# spawn_wait(path, argv, envp) combines fork + execve + wait4
+# into a single call.
 SYSCALL_SRCS := $(wildcard syscall/*.asm)
-SRCS         := $(SYSCALL_SRCS)
+UTIL_SRCS    := $(wildcard util/*.asm)
+SRCS         := $(SYSCALL_SRCS) $(UTIL_SRCS)
 OBJS         := $(SRCS:.asm=.o)
 
 UNAME_S := $(shell uname -s)
@@ -30,6 +31,12 @@ $(ARCHIVE): $(OBJS)
 # directory. The dependency on syscall.inc forces every wrapper
 # to rebuild when the shared header changes.
 syscall/%.o: syscall/%.asm syscall/syscall.inc
+	nasm $(NASM_FLAGS) -I syscall/ $< -o $@
+
+# util/ helpers compose syscall wrappers and also %include
+# "syscall.inc" for the SYS_exit / SYS_execve constants used
+# on the child-side exec failure path.
+util/%.o: util/%.asm syscall/syscall.inc
 	nasm $(NASM_FLAGS) -I syscall/ $< -o $@
 
 # Smoke-test the archive end to end. Invoked via bash so no exec

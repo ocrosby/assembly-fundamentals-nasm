@@ -30,7 +30,7 @@ All archives in this directory share the same conventions:
 | [`io/`](io/)      | `libio.a`   | File-descriptor primitives from `<fcntl.h>` / `<unistd.h>` (`open`, `openat`, `lseek`, `pread`, `pwrite`). |
 | [`resolv/`](resolv/) | `libresolv.a` | DNS A-record resolver over UDP. Wire encode / decode plus a `resolv_a(name, resolver, port, out_ip)` entry point built on `libsock`. |
 | [`time/`](time/)  | `libtime.a` | Wall-clock and CPU-time primitives from `<sys/time.h>` / `<sys/resource.h>` — `gettimeofday`, `sleep_ms`, `getrusage`. Nanosecond-precision monotonic time deferred; the macOS path is blocked without libSystem. |
-| [`proc/`](proc/)  | `libproc.a` | Process control from `<unistd.h>` / `<sys/wait.h>` / `<signal.h>` — `fork`, `wait4`, `getpid`, `getppid`, `kill`. `execve` deferred. |
+| [`proc/`](proc/)  | `libproc.a` | Process control from `<unistd.h>` / `<sys/wait.h>` / `<signal.h>` — `fork`, `execve`, `wait4`, `getpid`, `getppid`, `kill`, plus a `spawn_wait` composed helper. |
 
 Each subdirectory's `README.md` documents the exported symbols and
 calling conventions for that archive.
