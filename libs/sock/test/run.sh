@@ -1,15 +1,14 @@
 #!/usr/bin/env bash
 # run.sh — smoke-test suite for libsock.a.
 #
-# Runs five tests in sequence and prints one PASS/FAIL line per
+# Runs seven tests in sequence and prints one PASS/FAIL line per
 # test. Exits 0 iff every test passed.
 #
 #   1. inet4-smoke   — byte-order helpers plus strict IPv4 text
 #                      conversion (inet_pton4 / inet_ntop4)
-#   2. inet6-smoke   — inet_pton6 / inet_ntop6 across 33 sub-checks
-#                      spanning the accepted RFC 4291 grammar, the
-#                      documented rejection cases, RFC 5952
-#                      canonical output, and a round-trip
+#   2. inet6-smoke   — inet_pton6 / inet_ntop6 across all
+#                      documented accept/reject cases and the RFC
+#                      5952 canonical output rules
 #   3. ipc-smoke     — socketpair, send/recv, sendto/recvfrom,
 #                      sendmsg/recvmsg, select, poll — all
 #                      exercised against an AF_UNIX SOCK_STREAM
@@ -23,14 +22,19 @@
 #                      Python server (server.py)
 #   6. server-smoke  — end-to-end TCP server; a Python client
 #                      (server-client.py) drives the exchange
+#   7. c-smoke       — verify libsock.a is linkable and callable
+#                      from a C toolchain, not just from NASM
 #
 # Together these cover every one of the 30 symbols libsock.a
 # exports at least once via a success path (1-3, 5, 6) and every
-# syscall wrapper's failure branch once (4).
+# syscall wrapper's failure branch once (4). Test 7 is a
+# compatibility smoke — it doesn't add coverage but verifies the
+# archive is usable from a C consumer that lists it before libc
+# on the link line.
 #
-# Requires: nasm, ld (binutils), python3 (for tcp-smoke and
-# server-smoke). Assumes ../libsock.a and ../../asm/libasm.a
-# already exist — the Makefile `test` target builds them first.
+# Requires: nasm, ld (binutils), cc, python3. Assumes
+# ../libsock.a and ../../asm/libasm.a already exist — the
+# Makefile `test` target builds them first.
 set -euo pipefail
 
 cd "$(dirname "$0")"                 # libs/sock/test
@@ -177,6 +181,37 @@ if [ "$server_code" -eq 0 ] && [ "$client_code" -eq 0 ]; then
 else
     printf "FAIL: %-14s server_exit=%d client_exit=%d output=[%s]\n" \
         "server-smoke" "$server_code" "$client_code" "$srv_msg"
+    fail_total=$((fail_total + 1))
+fi
+
+# ---------------------------------------------------------------
+# c-smoke — verify libsock.a is callable from a C toolchain.
+# ---------------------------------------------------------------
+# On Darwin libsock.a is built as x86_64; force clang to match so
+# an Apple Silicon runner (native arm64) picks up the archive's
+# objects and runs the result under Rosetta 2. On Linux the
+# native arch already matches. -Wl,-w silences the ld warnings
+# about missing LC_BUILD_VERSION load commands NASM does not emit.
+c_arch_flag=""
+c_link_flag=""
+if [ "$(uname -s)" = "Darwin" ]; then
+    c_arch_flag="-arch x86_64"
+    c_link_flag="-Wl,-w"
+fi
+
+# shellcheck disable=SC2086  # word-splitting the flag lists is intentional
+cc $c_arch_flag $c_link_flag c-smoke.c ../libsock.a -o c-smoke 2>/dev/null
+
+set +e
+c_out="$(./c-smoke 2>&1)"
+c_code=$?
+set -e
+rm -f c-smoke
+
+if [ "$c_code" -eq 0 ] && [ "$c_out" = "PASS" ]; then
+    printf "PASS: %-14s output=[%s]\n" "c-smoke" "$c_out"
+else
+    printf "FAIL: %-14s exit=%d output=[%s]\n" "c-smoke" "$c_code" "$c_out"
     fail_total=$((fail_total + 1))
 fi
 

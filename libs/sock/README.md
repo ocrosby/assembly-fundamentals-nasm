@@ -159,7 +159,7 @@ run `make -C ../../libs/sock` first.
 make test                           # requires python3
 ```
 
-`make test` builds `libsock.a` and `libasm.a`, then runs six
+`make test` builds `libsock.a` and `libasm.a`, then runs seven
 smoke tests in sequence via the harness in [`test/`](test/).
 Together they call every one of the 30 exported symbols on at
 least one success path; every syscall wrapper on at least one
@@ -211,6 +211,18 @@ regression case is sub-check `q` in `inet6-smoke`.
   `listen`, `getsockname`, `getsockopt`, `accept`, `getpeername`,
   and `shutdown` — the remaining wrappers not touched by the
   other tests.
+- [`c-smoke.c`](test/c-smoke.c) — compatibility smoke, not a
+  coverage test. Verifies `libsock.a` is linkable and callable
+  from a normal C toolchain: manually declares the archive's
+  symbols with GCC `__asm__` labels (to bypass Mach-O's
+  underscore-prefix convention that would otherwise hide our
+  NASM-emitted bare names), links `libsock.a` before libc, and
+  asserts `htons`/`htonl`/`ntohs`/`ntohl` byte-swap correctly,
+  `inet_pton4`/`inet_ntop4`/`inet_pton6`/`inet_ntop6`
+  round-trip, and `socket(AF_INET, SOCK_STREAM, 0) + close(fd)`
+  returns a valid fd. If the archive were ever broken for C
+  consumers (ABI mismatch, unresolvable symbols, wrong return
+  register), this test catches it.
 
 All server-side sockets are loopback-only, single-connection,
 and timeout-bounded, so the tests never reach the network and
@@ -223,6 +235,7 @@ PASS: ipc-smoke      output=[PASS]
 PASS: fail-smoke     output=[PASS]
 PASS: tcp-smoke      output=[TCP-OK]
 PASS: server-smoke   output=[PORT:<n>]
+PASS: c-smoke        output=[PASS]
 ```
 
 All three run on both macOS and Linux under CI.
