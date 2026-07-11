@@ -20,11 +20,15 @@ libs/io/test/io-smoke
 libs/io/test/fail-smoke
 libs/io/test/c-smoke
 libs/resolv/test/resolv-smoke
+libs/resolv/test/v12-smoke
 libs/resolv/test/hosts-smoke
 libs/resolv/test/resolvconf-smoke
 libs/resolv/test/hostname-smoke
 libs/resolv/test/fail-smoke
 libs/resolv/test/c-smoke
+
+# Python cache under mock server directory
+libs/resolv/test/__pycache__/
 
 # Built example binaries. Ignore everything inside a numbered example
 # directory, then un-ignore the source files we actually want tracked.

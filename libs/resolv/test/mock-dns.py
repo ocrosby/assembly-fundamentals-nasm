@@ -26,11 +26,23 @@ import struct
 import sys
 
 TIMEOUT_SECONDS = 10
-MAX_SERVES = 5
+MAX_SERVES = 20
 
 OK_NAME = b"libresolv-ok.test"
 NX_NAME = b"libresolv-nxdomain.test"
-OK_ADDR = bytes((203, 0, 113, 42))          # TEST-NET-3 (RFC 5737)
+AAAA_NAME = b"libresolv-aaaa.test"
+CNAME_NAME = b"libresolv-cname.test"
+MULTI_NAME = b"libresolv-multi.test"
+LOOP_NAME = b"libresolv-loop-a.test"       # → loop-b.test → loop-a.test
+LOOP_NAME_B = b"libresolv-loop-b.test"
+
+OK_ADDR = bytes((203, 0, 113, 42))         # TEST-NET-3 (RFC 5737)
+MULTI_ADDRS = [
+    bytes((203, 0, 113, 1)),
+    bytes((203, 0, 113, 2)),
+    bytes((203, 0, 113, 3)),
+]
+AAAA_ADDR = bytes.fromhex("20010db8000000000000000000000042")  # 2001:db8::42
 
 
 def decode_qname(payload: bytes, offset: int) -> tuple[bytes, int]:
@@ -76,15 +88,46 @@ def build_response(query: bytes) -> bytes | None:
     if next_off + 4 > len(query):
         return None
     qtype, qclass = struct.unpack(">HH", query[next_off : next_off + 4])
-    if qtype != 1 or qclass != 1:
-        # We only serve A/IN; call it SERVFAIL.
+    if qclass != 1:
         return _servfail(query_id, query, next_off + 4)
 
-    if qname == OK_NAME:
-        return _answer(query_id, query, next_off + 4)
-    if qname == NX_NAME:
-        return _nxdomain(query_id, query, next_off + 4)
+    if qtype == 1:                               # A
+        return _dispatch_a(qname, query_id, query, next_off + 4)
+    if qtype == 28:                              # AAAA
+        return _dispatch_aaaa(qname, query_id, query, next_off + 4)
     return _servfail(query_id, query, next_off + 4)
+
+
+def _dispatch_a(qname, query_id, query, qend):
+    if qname == OK_NAME:
+        return _answer_a(query_id, query, qend, [OK_ADDR])
+    if qname == NX_NAME:
+        return _nxdomain(query_id, query, qend)
+    if qname == MULTI_NAME:
+        return _answer_a(query_id, query, qend, MULTI_ADDRS)
+    if qname == CNAME_NAME:
+        return _answer_cname(query_id, query, qend, OK_NAME)
+    if qname == LOOP_NAME:
+        return _answer_cname(query_id, query, qend, LOOP_NAME_B)
+    if qname == LOOP_NAME_B:
+        return _answer_cname(query_id, query, qend, LOOP_NAME)
+    if qname == AAAA_NAME:
+        # AAAA-only name: honest answer to A is empty (RCODE 0,
+        # ANCOUNT 0).
+        return _empty_ok(query_id, query, qend)
+    return _servfail(query_id, query, qend)
+
+
+def _dispatch_aaaa(qname, query_id, query, qend):
+    if qname == AAAA_NAME:
+        return _answer_aaaa(query_id, query, qend, [AAAA_ADDR])
+    if qname == NX_NAME:
+        return _nxdomain(query_id, query, qend)
+    if qname == CNAME_NAME:
+        # For AAAA, chase to a name that has an AAAA so the test
+        # can exercise the chase-then-answer path.
+        return _answer_cname(query_id, query, qend, AAAA_NAME)
+    return _empty_ok(query_id, query, qend)
 
 
 def _flags(rcode: int) -> int:
@@ -100,20 +143,43 @@ def _echo_question(query: bytes, question_end: int) -> bytes:
     return query[12:question_end]
 
 
-def _answer(query_id: int, query: bytes, question_end: int) -> bytes:
+def _answer_a(query_id, query, question_end, addrs):
+    header = _header(query_id, 0, len(addrs))
+    question = _echo_question(query, question_end)
+    rrs = b"".join(
+        struct.pack(">HHHIH", 0xC00C, 1, 1, 60, 4) + addr for addr in addrs
+    )
+    return header + question + rrs
+
+
+def _answer_aaaa(query_id, query, question_end, addrs):
+    header = _header(query_id, 0, len(addrs))
+    question = _echo_question(query, question_end)
+    rrs = b"".join(
+        struct.pack(">HHHIH", 0xC00C, 28, 1, 60, 16) + addr for addr in addrs
+    )
+    return header + question + rrs
+
+
+def _answer_cname(query_id, query, question_end, target):
+    """CNAME answer pointing the query name at `target`."""
     header = _header(query_id, 0, 1)
     question = _echo_question(query, question_end)
-    # Answer: name pointer back to the question (offset 12 in the packet),
-    # TYPE=A, CLASS=IN, TTL=60, RDLENGTH=4, RDATA=OK_ADDR.
-    answer = struct.pack(">HHHIH", 0xC00C, 1, 1, 60, 4) + OK_ADDR
-    return header + question + answer
+    target_wire = encode_qname(target)
+    rr = struct.pack(">HHHIH", 0xC00C, 5, 1, 60, len(target_wire)) + target_wire
+    return header + question + rr
 
 
-def _nxdomain(query_id: int, query: bytes, question_end: int) -> bytes:
+def _empty_ok(query_id, query, question_end):
+    """Well-formed response, RCODE=0, ANCOUNT=0."""
+    return _header(query_id, 0, 0) + _echo_question(query, question_end)
+
+
+def _nxdomain(query_id, query, question_end):
     return _header(query_id, 3, 0) + _echo_question(query, question_end)
 
 
-def _servfail(query_id: int, query: bytes, question_end: int) -> bytes:
+def _servfail(query_id, query, question_end):
     return _header(query_id, 2, 0) + _echo_question(query, question_end)
 
 
