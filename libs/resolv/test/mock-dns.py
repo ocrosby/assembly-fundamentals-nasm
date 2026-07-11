@@ -8,8 +8,14 @@ argv[1], and then serves at most a handful of DNS queries.
 The mock responds according to the QNAME of each query:
 
   * "libresolv-ok.test"     → A record 203.0.113.42 (RCODE 0)
-  * "libresolv-nxdomain.test" → NXDOMAIN response (RCODE 3)
-  * anything else            → SERVFAIL (RCODE 2)
+  * "libresolv-nxdomain.test" → NXDOMAIN (RCODE 3)
+  * "libresolv-servfail.test" → SERVFAIL (RCODE 2)
+  * anything else            → NXDOMAIN (RCODE 3)
+
+Unknown names default to NXDOMAIN so the v1.5 search-domain
+fallback in resolv_hostname_at can trigger — that path only
+retries with a suffix when the first query returns NXDOMAIN.
+Explicit SERVFAIL testing goes through libresolv-servfail.test.
 
 Only enough of RFC 1035 is implemented to satisfy the assembly
 client — no compression on names, no additional records, no
@@ -30,6 +36,7 @@ MAX_SERVES = 20
 
 OK_NAME = b"libresolv-ok.test"
 NX_NAME = b"libresolv-nxdomain.test"
+SERVFAIL_NAME = b"libresolv-servfail.test"
 AAAA_NAME = b"libresolv-aaaa.test"
 CNAME_NAME = b"libresolv-cname.test"
 MULTI_NAME = b"libresolv-multi.test"
@@ -103,6 +110,8 @@ def _dispatch_a(qname, query_id, query, qend):
         return _answer_a(query_id, query, qend, [OK_ADDR])
     if qname == NX_NAME:
         return _nxdomain(query_id, query, qend)
+    if qname == SERVFAIL_NAME:
+        return _servfail(query_id, query, qend)
     if qname == MULTI_NAME:
         return _answer_a(query_id, query, qend, MULTI_ADDRS)
     if qname == CNAME_NAME:
@@ -115,7 +124,9 @@ def _dispatch_a(qname, query_id, query, qend):
         # AAAA-only name: honest answer to A is empty (RCODE 0,
         # ANCOUNT 0).
         return _empty_ok(query_id, query, qend)
-    return _servfail(query_id, query, qend)
+    # Unknown name — default NXDOMAIN so search-domain fallback
+    # can trigger without ambiguity.
+    return _nxdomain(query_id, query, qend)
 
 
 def _dispatch_aaaa(qname, query_id, query, qend):
@@ -123,11 +134,16 @@ def _dispatch_aaaa(qname, query_id, query, qend):
         return _answer_aaaa(query_id, query, qend, [AAAA_ADDR])
     if qname == NX_NAME:
         return _nxdomain(query_id, query, qend)
+    if qname == SERVFAIL_NAME:
+        return _servfail(query_id, query, qend)
     if qname == CNAME_NAME:
         # For AAAA, chase to a name that has an AAAA so the test
         # can exercise the chase-then-answer path.
         return _answer_cname(query_id, query, qend, AAAA_NAME)
-    return _empty_ok(query_id, query, qend)
+    # Unknown name → NXDOMAIN (parallel to the A path). Callers
+    # that specifically want RCODE=0/ANCOUNT=0 use the "A on
+    # an AAAA-only name" path via _dispatch_a for AAAA_NAME.
+    return _nxdomain(query_id, query, qend)
 
 
 def _flags(rcode: int) -> int:
