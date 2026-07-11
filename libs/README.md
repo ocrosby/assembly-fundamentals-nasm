@@ -29,7 +29,7 @@ All archives in this directory share the same conventions:
 | [`sock/`](sock/)  | `libsock.a` | Berkeley sockets syscall wrappers plus `<arpa/inet.h>` byte-order and IPv4/IPv6 text helpers, and composed util helpers (`server_bind_listen`, `client_connect`, `set_recv_timeout_ms`, `set_send_timeout_ms`, `send_all`). |
 | [`io/`](io/)      | `libio.a`   | File-descriptor primitives from `<fcntl.h>` / `<unistd.h>` (`open`, `openat`, `lseek`, `pread`, `pwrite`), plus stat/mkdir/*at, fcntl, flock, and mmap/munmap. |
 | [`resolv/`](resolv/) | `libresolv.a` | DNS A-record resolver over UDP. Wire encode / decode plus a `resolv_a(name, resolver, port, out_ip)` entry point built on `libsock`, a `resolv_sockaddr` composed helper that returns a filled `struct sockaddr_in`, and a `resolv_dial` composed helper that returns a connected fd. |
-| [`time/`](time/)  | `libtime.a` | Wall-clock and CPU-time primitives from `<sys/time.h>` / `<sys/resource.h>` — `gettimeofday`, `sleep_ms`, `getrusage`, plus `time_diff_us` and `now_ms` util helpers. Nanosecond-precision monotonic time deferred; the macOS path is blocked without libSystem. |
+| [`time/`](time/)  | `libtime.a` | Wall-clock and CPU-time primitives from `<sys/time.h>` / `<sys/resource.h>` — `gettimeofday`, `sleep_ms`, `getrusage`, plus `time_diff_us`, `now_ms`, and `monotonic_ms` util helpers. `monotonic_ms` is deliberately asymmetric: Linux uses `clock_gettime(CLOCK_MONOTONIC, ...)`, macOS returns `-ENOSYS`. |
 | [`proc/`](proc/)  | `libproc.a` | Process control from `<unistd.h>` / `<sys/wait.h>` / `<signal.h>` — `fork`, `execve`, `wait4`, `getpid`, `getppid`, `kill`, plus a `spawn_wait` composed helper. |
 
 Each subdirectory's `README.md` documents the exported symbols and

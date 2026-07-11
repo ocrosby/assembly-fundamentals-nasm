@@ -51,6 +51,12 @@
 ;   G  now_ms() >= 1_700_000_000_000       (Nov 2023 in ms)
 ;   H  second now_ms() call within 5000 ms of the first
 ;      (monotonic + bounded)
+;
+; v1.4 — monotonic_ms util helper (deliberately asymmetric):
+;   I  Linux: monotonic_ms() >= 0.
+;      macOS: monotonic_ms() == -78 (-ENOSYS).
+;   J  Linux only: second call within 5000 ms of the first,
+;      non-decreasing (monotonic invariant).
 
 %include "syscall.inc"
 
@@ -64,7 +70,7 @@
 
 default rel
 
-extern gettimeofday, sleep_ms, getrusage, time_diff_us, now_ms
+extern gettimeofday, sleep_ms, getrusage, time_diff_us, now_ms, monotonic_ms
 
 global _start
 global _main
@@ -244,6 +250,32 @@ _main:
     jl .fail                         ; must not go backward
     cmp rax, 5000
     jg .fail                         ; must be bounded
+
+    ; ---- v1.4: monotonic_ms — deliberately asymmetric ----
+    ; I: Linux → non-negative monotonic ms.
+    ;    macOS → -78 (-ENOSYS). Callers detect and fall back.
+    mov byte [fail_id], 'I'
+    call monotonic_ms
+%ifdef MACOS
+    cmp rax, -78
+    jne .fail
+%else
+    test rax, rax
+    js .fail
+    mov r15, rax                     ; save first monotonic reading
+
+    ; J: on Linux, a second call must be >= the first and
+    ;    within a small bound (guards against wildly wrong
+    ;    unit conversion — e.g. seconds treated as ms would
+    ;    produce a 1000× drift).
+    mov byte [fail_id], 'J'
+    call monotonic_ms
+    sub rax, r15
+    cmp rax, 0
+    jl .fail                         ; monotonic can never go backward
+    cmp rax, 5000
+    jg .fail                         ; delta bounded (5s slack)
+%endif
 
     ; PASS
     mov rax, SYS_write
