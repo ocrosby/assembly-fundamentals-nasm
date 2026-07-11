@@ -26,13 +26,29 @@
 
 %ifdef MACOS
 %define SYS_gettimeofday 0x2000074
+%define SYS_poll         0x20000e6
+%define SYS_getrusage    0x2000075
 %else
 %define SYS_gettimeofday 96
+%define SYS_poll         7
+%define SYS_getrusage    98
 %endif
 
 %define TV_SEC_OFF   0
 %define TV_USEC_OFF  8
 %define TIMEVAL_SIZE 16
+
+; getrusage(who, rusage*) — who selectors.
+%define RUSAGE_SELF      0
+%define RUSAGE_CHILDREN  -1
+
+; struct rusage — the two struct timevals we care about here.
+; ru_utime and ru_stime are `struct timeval` at fixed offsets,
+; identical on both platforms; the remaining fields (page faults,
+; context switches, …) differ in width and are not exposed via
+; libtime constants.
+%define RU_UTIME_OFF 0
+%define RU_STIME_OFF 16
 
 %macro SYSCALL_NORM 0
     syscall

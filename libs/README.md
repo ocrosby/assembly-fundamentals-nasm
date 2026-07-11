@@ -29,7 +29,7 @@ All archives in this directory share the same conventions:
 | [`sock/`](sock/)  | `libsock.a` | Berkeley sockets syscall wrappers plus `<arpa/inet.h>` byte-order and IPv4/IPv6 text helpers.  |
 | [`io/`](io/)      | `libio.a`   | File-descriptor primitives from `<fcntl.h>` / `<unistd.h>` (`open`, `openat`, `lseek`, `pread`, `pwrite`). |
 | [`resolv/`](resolv/) | `libresolv.a` | DNS A-record resolver over UDP. Wire encode / decode plus a `resolv_a(name, resolver, port, out_ip)` entry point built on `libsock`. |
-| [`time/`](time/)  | `libtime.a` | Wall-clock and (v1.1) monotonic-time primitives from `<sys/time.h>` / `<time.h>` — currently `gettimeofday`, with `clock_gettime` / `nanosleep` / monotonic time held for a design pass. |
+| [`time/`](time/)  | `libtime.a` | Wall-clock and CPU-time primitives from `<sys/time.h>` / `<sys/resource.h>` — `gettimeofday`, `sleep_ms`, `getrusage`. Nanosecond-precision monotonic time deferred; the macOS path is blocked without libSystem. |
 
 Each subdirectory's `README.md` documents the exported symbols and
 calling conventions for that archive.
