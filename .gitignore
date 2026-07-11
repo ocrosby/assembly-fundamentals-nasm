@@ -11,7 +11,10 @@
 # Built smoke-test clients (object files are covered by *.o above)
 libs/sock/test/inet4-smoke
 libs/sock/test/inet6-smoke
+libs/sock/test/ipc-smoke
+libs/sock/test/fail-smoke
 libs/sock/test/tcp-smoke
+libs/sock/test/server-smoke
 
 # Built example binaries. Ignore everything inside a numbered example
 # directory, then un-ignore the source files we actually want tracked.
