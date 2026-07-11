@@ -95,6 +95,16 @@ nameserver 10.0.0.3:abc
 nameserver 198.51.100.1:9999
 PORTSEOF
 
+# Search fixture (v1.5). `domain` comes first; `search` follows
+# and, per last-write-wins, is what resolv_conf_read_search
+# returns.
+conf_search_fixture="$tmp/resolv.search.conf"
+cat > "$conf_search_fixture" <<'SEARCHEOF'
+domain first.example
+search a.example b.example c.example
+nameserver 127.0.0.1
+SEARCHEOF
+
 hostname_hosts_fixture="$tmp/hostname-hosts"
 cat > "$hostname_hosts_fixture" <<'HNHEOF'
 198.18.0.1 libresolv-hostname-hit.test
@@ -215,6 +225,7 @@ nasm $nasm_fmt \
     -DCONF_PATH="\"$conf_fixture\"" \
     -DCONF_EMPTY_PATH="\"$conf_empty_fixture\"" \
     -DCONF_PORTS_PATH="\"$conf_ports_fixture\"" \
+    -DCONF_SEARCH_PATH="\"$conf_search_fixture\"" \
     resolvconf-smoke.asm -o resolvconf-smoke.o
 "${ld_cmd[@]}" resolvconf-smoke.o "${libs[@]}" -o resolvconf-smoke
 
@@ -262,11 +273,22 @@ nameserver 127.0.0.1:1
 nameserver 127.0.0.1:$port3
 HFEOF
 
+    # v1.5 search-domain fixture — one live resolver plus a
+    # `search test` directive. Sub-check 6 sends "libresolv-ok"
+    # (no dot), the mock NXDOMAINs it, then the fallback
+    # composes "libresolv-ok.test" and the mock answers.
+    hostname_search_conf="$tmp/hostname-search-conf"
+    cat > "$hostname_search_conf" <<HSEOF
+search test
+nameserver 127.0.0.1:$port3
+HSEOF
+
     # shellcheck disable=SC2086
     nasm $nasm_fmt \
         -DHOSTS_PATH="\"$hostname_hosts_fixture\"" \
         -DCONF_PATH="\"$hostname_conf_fixture\"" \
         -DFAILOVER_CONF_PATH="\"$hostname_failover_conf\"" \
+        -DSEARCH_CONF_PATH="\"$hostname_search_conf\"" \
         hostname-smoke.asm -o hostname-smoke.o
     "${ld_cmd[@]}" hostname-smoke.o "${libs[@]}" -o hostname-smoke
 

@@ -18,6 +18,16 @@
 ;     fixture (see below) mixes valid :port suffixes with
 ;     three invalid ones (port 0, port > u16, non-digit). The
 ;     parser must produce exactly the two valid entries.
+;   8 (v1.5) resolv_conf_read_search parses `search a b c` from
+;     the search fixture. Last-write-wins: a preceding `domain
+;     first.example` gets overridden. Expect count=3 with the
+;     three suffixes in listed order, packed NUL-terminated.
+;   9 (v1.5) resolv_conf_read_search on the empty-of-
+;     nameservers fixture returns 1 with entry "test" —
+;     that fixture holds a bare `domain test` directive,
+;     which is the legacy single-domain shorthand for
+;     `search test`. This sub-check exercises the `domain`
+;     branch specifically.
 ;
 ; The primary fixture file created by run.sh has this content:
 ;
@@ -48,6 +58,9 @@
 %ifndef CONF_PORTS_PATH
 %define CONF_PORTS_PATH "/tmp/libresolv-resolvconf-ports-default"
 %endif
+%ifndef CONF_SEARCH_PATH
+%define CONF_SEARCH_PATH "/tmp/libresolv-resolvconf-search-default"
+%endif
 
 %ifdef MACOS
 %define SYS_write 0x2000004
@@ -59,16 +72,25 @@
 
 default rel
 
-extern resolv_conf_read, resolv_conf_read_all
+extern resolv_conf_read, resolv_conf_read_all, resolv_conf_read_search
 
 global _start
 global _main
 
 section .rodata
-conf_path:       db CONF_PATH, 0
-conf_empty_path: db CONF_EMPTY_PATH, 0
-conf_ports_path: db CONF_PORTS_PATH, 0
-missing_path:    db "/proc/libresolv/does-not-exist-", 0
+conf_path:        db CONF_PATH, 0
+conf_empty_path:  db CONF_EMPTY_PATH, 0
+conf_ports_path:  db CONF_PORTS_PATH, 0
+conf_search_path: db CONF_SEARCH_PATH, 0
+missing_path:     db "/proc/libresolv/does-not-exist-", 0
+
+; Expected search-domain packed strings from CONF_SEARCH_PATH:
+;   "a.example\0b.example\0c.example\0"
+exp_search_pack: db "a.example", 0, "b.example", 0, "c.example", 0
+exp_search_len:  equ $ - exp_search_pack
+; Expected from CONF_EMPTY_PATH's `domain test` directive:
+;   "test\0"
+exp_domain_pack: db "test", 0
 
 ; Expected: 192.0.2.53 as network-order bytes.
 exp_ip:          db 192, 0, 2, 53
@@ -91,6 +113,9 @@ ip_buf:      resb 4
 ; resolv_conf_read_all writes 8-byte packed entries. Reserve
 ; room for MAX_RESOLVERS (8) so we can accept any legal count.
 entry_buf:   resb 64
+; resolv_conf_read_search writes NUL-terminated strings back
+; to back. 128 bytes fits any realistic search list.
+search_buf:  resb 128
 
 section .text
 
@@ -194,10 +219,40 @@ _main:
     cmp eax, 9999
     jne .fail
 
-    ; (Sub-check 8 folded into 7 — the count-of-2 assertion
-    ; there already proves the three malformed :port lines
-    ; were silently skipped. Keeping a separate ID would
-    ; require re-reading the count into rax; not worth it.)
+    ; 8: (v1.5) resolv_conf_read_search on the search fixture
+    ; returns 3 and the packed payload matches the expected
+    ; NUL-separated list.
+    mov byte [fail_id], '8'
+    lea rdi, [conf_search_path]
+    lea rsi, [search_buf]
+    mov edx, 128
+    call resolv_conf_read_search
+    cmp rax, 3
+    jne .fail
+    ; Compare exp_search_len bytes.
+    lea rdi, [search_buf]
+    lea rsi, [exp_search_pack]
+    mov ecx, exp_search_len
+    call memeq
+    test rax, rax
+    jz .fail
+
+    ; 9: `domain test` on the empty-of-nameservers fixture
+    ; yields count=1 with "test" as the single entry.
+    mov byte [fail_id], '9'
+    lea rdi, [conf_empty_path]
+    lea rsi, [search_buf]
+    mov edx, 128
+    call resolv_conf_read_search
+    cmp rax, 1
+    jne .fail
+    ; Compare 5 bytes: "test\0"
+    lea rdi, [search_buf]
+    lea rsi, [exp_domain_pack]
+    mov ecx, 5
+    call memeq
+    test rax, rax
+    jz .fail
 
     ; PASS
     mov rax, SYS_write
@@ -218,3 +273,21 @@ _main:
     mov rax, SYS_exit
     mov edi, 1
     syscall
+
+; memeq(rdi=a, rsi=b, ecx=len) → rax = 1 if equal else 0
+memeq:
+    xor edx, edx
+.mem_loop:
+    cmp edx, ecx
+    jge .mem_eq
+    mov al, [rdi + rdx]
+    cmp al, [rsi + rdx]
+    jne .mem_ne
+    inc edx
+    jmp .mem_loop
+.mem_eq:
+    mov eax, 1
+    ret
+.mem_ne:
+    xor eax, eax
+    ret

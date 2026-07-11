@@ -46,6 +46,13 @@
 ;     spun up by run.sh, which answers the canonical name.
 ;     The lookup passes only if the iteration falls through
 ;     from resolver 1 to resolver 2.
+;   6 v1.5 search-domain fallback: SEARCH_CONF_PATH lists one
+;     nameserver (the mock) and `search test`. The query name
+;     "libresolv-ok" has no dot, so v1.5's iteration composes
+;     "libresolv-ok.test" and gets 203.0.113.42 from the mock.
+;     This proves both that the mock's NXDOMAIN triggers the
+;     fallback and that compose_name assembles the FQDN
+;     correctly.
 ;
 ; Fail IDs past 9 use letters — see hosts-smoke for the
 ; convention. The v6 sub-checks stay in the digit range so
@@ -59,6 +66,9 @@
 %endif
 %ifndef FAILOVER_CONF_PATH
 %define FAILOVER_CONF_PATH "/tmp/libresolv-hostname-failover-default"
+%endif
+%ifndef SEARCH_CONF_PATH
+%define SEARCH_CONF_PATH "/tmp/libresolv-hostname-search-default"
 %endif
 
 %ifdef MACOS
@@ -80,6 +90,7 @@ section .rodata
 hosts_path:    db HOSTS_PATH, 0
 conf_path:     db CONF_PATH, 0
 failover_conf_path: db FAILOVER_CONF_PATH, 0
+search_conf_path:   db SEARCH_CONF_PATH, 0
 
 n_hit:      db "libresolv-hostname-hit.test", 0
 n_miss:     db "no-such.test", 0
@@ -87,6 +98,9 @@ n_v6_hit:   db "libresolv-hostname-v6.test", 0
 ; The mock server answers this canonical name with an A record
 ; for 203.0.113.42. Used to verify sub-check 5's failover.
 n_failover: db "libresolv-ok.test", 0
+; Bare short name — sub-check 6's search-domain iteration
+; composes it with "test" to hit the mock.
+n_search:   db "libresolv-ok", 0
 
 exp_hit:    db 198, 18, 0, 1
 exp_failover: db 203, 0, 113, 42
@@ -177,6 +191,23 @@ _main:
     test rax, rax
     jnz .fail
     mov eax, [rel exp_failover]
+    cmp eax, dword [ip_buf]
+    jne .fail
+
+    ; 6: v1.5 search-domain fallback — SEARCH_CONF_PATH has
+    ; `search test` + the mock. Query "libresolv-ok" (no dot):
+    ; the mock replies NXDOMAIN for the bare name, then search
+    ; iteration composes "libresolv-ok.test" and gets the A
+    ; record for 203.0.113.42.
+    mov byte [fail_id], '6'
+    lea rdi, [hosts_path]
+    lea rsi, [search_conf_path]
+    lea rdx, [n_search]
+    lea rcx, [ip_buf]
+    call resolv_hostname_at
+    test rax, rax
+    jnz .fail
+    mov eax, [rel exp_failover]     ; same 203.0.113.42
     cmp eax, dword [ip_buf]
     jne .fail
 

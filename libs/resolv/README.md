@@ -12,7 +12,10 @@ target (chased transparently up to eight hops). The
 [`libio`](../io/) archive is used for the `/etc/hosts` and
 `/etc/resolv.conf` layer that the hostname-level entry points
 sit on top of; both IPv4 and IPv6 variants share the parser
-via a family flag.
+via a family flag. The hostname layer iterates through every
+resolver listed in `/etc/resolv.conf` and, for unqualified
+names, retries with each entry from the `search` / `domain`
+directives.
 
 Every routine is a direct syscall (through `libsock`) or pure
 computation — no libc, no libSystem call, no allocation. Same
@@ -91,6 +94,33 @@ separate concern deferred past v1.3.
 | -------------------------- | ---------------------------------------------------------------------- | ------------------------------------------ |
 | `resolv_conf_read_all`     | `path`, `out_buf*`, `max_count`                                        | count copied (`0..max_count`) or negative errno |
 
+**v1.5 — search-domain iteration:**
+
+| Symbol                     | Arguments                                                              | Returns                                    |
+| -------------------------- | ---------------------------------------------------------------------- | ------------------------------------------ |
+| `resolv_conf_read_search`  | `path`, `out_buf*`, `capacity`                                         | count of domains, `0` when empty, `-ENOSPC` on overflow, `-errno` on file error |
+
+`resolv_conf_read_search` parses the `search` and `domain`
+directives from `/etc/resolv.conf` and writes each domain to
+`out_buf` as a NUL-terminated ASCII string, laid down
+back-to-back. Per RFC 1035, `search` and `domain` are
+mutually exclusive — the LAST occurrence in the file wins.
+
+`resolv_hostname_at` and `resolv_hostname_at6` now trigger a
+search-domain fallback when the resolver list returns
+`-ENOENT` for a name that contains no dot. For each search
+suffix, the layer composes `<name>.<suffix>` into a stack
+scratch buffer and retries the full resolver list. The first
+composition that resolves wins; if every suffix fails, the
+last errno is returned.
+
+The fallback is deliberately narrow: names with a dot are
+treated as already qualified (no suffix appended), and
+non-`-ENOENT` errors (`-ETIMEDOUT`, `-ECONNREFUSED`, `-EIO`,
+…) short-circuit without triggering search. This matches
+libc's stub-resolver behavior — transient errors stop the
+walk; NXDOMAIN keeps it going.
+
 `resolv_conf_read_all` returns every parseable `nameserver`
 directive packed into `out_buf` as consecutive 8-byte entries:
 
@@ -166,13 +196,15 @@ constant in `resolv-a.asm`. Future work (v1.1) exposes it as a
 
 ## What is not here — yet
 
-v1.4 adds multi-resolver failover and a `:port` shorthand on
-top of the v1.3 v6 work. Still deferred:
+v1.5 adds search-domain iteration on top of v1.4's failover.
+Still deferred:
 
 - TCP fallback on the truncated (`TC=1`) response
 - DNS-over-IPv6 transport — the resolver IP itself is still a
   32-bit IPv4 address, even for AAAA queries
-- Search-domain iteration
+- `options ndots:N` — libresolv v1.5 uses a fixed rule
+  ("no dot at all → search"), which matches the common case
+  but not the RFC ndots knob
 - Per-attempt retry with exponential backoff — currently the
   iterator makes one attempt per resolver
 - DNSSEC signature validation — would drag crypto into scope
@@ -292,28 +324,28 @@ make test                           # requires python3
   match (`fe80::1`), and cross-family miss (v6 lookup of a
   v4-only name → `-ENOENT`).
 - [`resolvconf-smoke.asm`](test/resolvconf-smoke.asm) —
-  exercises `resolv_conf_read` and (v1.4)
-  `resolv_conf_read_all` against `mktemp`'d
-  /etc/resolv.conf fixtures. Seven sub-checks cover: first
+  exercises `resolv_conf_read`, (v1.4) `resolv_conf_read_all`,
+  and (v1.5) `resolv_conf_read_search` against `mktemp`'d
+  /etc/resolv.conf fixtures. Nine sub-checks cover: first
   parseable `nameserver` wins, non-existent-file error,
   empty-file miss, count-of-two multi-entry parse, empty
   file returns `0` (not `-ENOENT`) under the count-return
-  convention, `max_count` clamping, and the `:port`
-  shorthand — including that malformed ports (0, > 65535,
-  non-digit) cause the whole line to be silently skipped.
+  convention, `max_count` clamping, the `:port` shorthand
+  (including malformed-port skipping), search-domain parse
+  with last-write-wins between `domain` and `search`, and
+  the bare-`domain` legacy shorthand.
 - [`hostname-smoke.asm`](test/hostname-smoke.asm) —
   end-to-end test of `resolv_hostname_at` and
-  `resolv_hostname_at6`. Five sub-checks: v4 hosts hit
+  `resolv_hostname_at6`. Six sub-checks: v4 hosts hit
   shortcuts DNS (no packet ever sent), v4 hosts miss falls
   through to DNS (which fails because the fixture points at a
   port nothing listens on — the point is that the fall-through
-  *happens*), the same two paths for the v6 pair, and (v1.4)
-  a two-resolver failover check where a dead entry at
-  `127.0.0.1:1` is skipped and the second entry — a live
-  mock — answers with `libresolv-ok.test → 203.0.113.42`.
-  The failover sub-check exists specifically to prove the
-  hostname layer moves past the first failing resolver rather
-  than giving up immediately.
+  *happens*), the same two paths for the v6 pair, (v1.4) a
+  two-resolver failover where a dead entry at `127.0.0.1:1`
+  is skipped and a live mock answers, and (v1.5) a
+  search-domain fallback that composes the bare name
+  `libresolv-ok` with the `test` suffix from the fixture's
+  `search test` directive, then resolves via the mock.
 - [`c-smoke.c`](test/c-smoke.c) — verifies `libresolv.a` is
   linkable and callable from a C toolchain via `__asm__`
   labels. Encodes a small query (both `QTYPE=A` and

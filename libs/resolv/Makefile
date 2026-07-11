@@ -15,6 +15,7 @@ SRCS := \
     resolv-aaaa-all.asm \
     hosts.asm \
     resolvconf.asm \
+    resolvconf-search.asm \
     hostname.asm
 
 OBJS := $(SRCS:.asm=.o)

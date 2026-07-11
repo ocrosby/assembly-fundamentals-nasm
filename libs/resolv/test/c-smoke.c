@@ -48,6 +48,12 @@ extern long resolv_hostname6(const char *name,
 extern long resolv_conf_read_all(const char *path, void *out_buf,
                                   size_t max_count) __asm__("resolv_conf_read_all");
 
+/* v1.5: search-domain enumeration. Returns count of NUL-
+ * terminated domains packed back-to-back in out_buf, or a
+ * negative errno on failure. */
+extern long resolv_conf_read_search(const char *path, char *out_buf,
+                                     size_t capacity) __asm__("resolv_conf_read_search");
+
 static int fail(int id) {
     fprintf(stderr, "FAIL:%d\n", id);
     return 1;
@@ -115,6 +121,12 @@ int main(void) {
     unsigned char entries[64] = {0};
     if (resolv_conf_read_all("/proc/libresolv/does-not-exist-",
                               entries, 8) >= 0) return fail(11);
+
+    /* 10: resolv_conf_read_search on a missing file also
+     * returns a negative errno. Link-time check for v1.5. */
+    char search[128] = {0};
+    if (resolv_conf_read_search("/proc/libresolv/does-not-exist-",
+                                 search, sizeof search) >= 0) return fail(12);
 
     puts("PASS");
     return 0;
