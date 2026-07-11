@@ -68,6 +68,12 @@ extern long server_bind_listen(unsigned ip_net,
                                 int backlog)
     __asm__("server_bind_listen");
 
+/* v1.2 util helper — outbound counterpart. socket + connect
+ * composed into one call. */
+extern long client_connect(unsigned ip_net,
+                            unsigned short port_host)
+    __asm__("client_connect");
+
 static int fail(int id) {
     fprintf(stderr, "FAIL:%d\n", id);
     return 1;
@@ -138,6 +144,12 @@ int main(void) {
     long sfd2 = server_bind_listen(0x0100007Fu, 0u, 1);
     if (sfd2 < 0)                                    return fail(20);
     if (close((int)sfd2) != 0)                       return fail(21);
+
+    /* v1.2: client_connect to a port nothing listens on returns
+     * a negative errno without leaking the fd. Same close-on-
+     * fail contract as server_bind_listen. */
+    long cfail = client_connect(0x0100007Fu, 1u);
+    if (cfail >= 0)                                  return fail(22);
 
     puts("PASS");
     return 0;

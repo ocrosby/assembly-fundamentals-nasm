@@ -82,11 +82,12 @@ emits the RFC 5952 canonical form. Buffer-size requirements are
 exact accepted grammar, rejection cases, and canonical-form
 rules.
 
-### Composed server helpers (v1.1)
+### Composed helpers (v1.1 / v1.2)
 
 | Symbol               | Arguments                                                    | Returns                              |
 | -------------------- | ------------------------------------------------------------ | ------------------------------------ |
 | `server_bind_listen` | `ip_net` (u32 net order), `port_host` (u16), `backlog` (int) | fd or negative errno                 |
+| `client_connect`     | `ip_net` (u32 net order), `port_host` (u16)                  | fd or negative errno                 |
 
 `server_bind_listen` composes the four syscalls that every TCP
 server always makes into one call: `socket(AF_INET,
@@ -101,6 +102,15 @@ Pass `ip_net = 0` for `INADDR_ANY` (bind every interface),
 `inet_pton4` output for any other IPv4 literal. Pass
 `port_host = 0` to let the kernel pick an ephemeral port; the
 caller reads it back via `getsockname` on the returned fd.
+
+`client_connect` is the outbound counterpart: `socket(AF_INET,
+SOCK_STREAM, 0)` → `connect(sockaddr_in{ip, port}, 16)`. The
+returned fd is ready for `read` / `write`. Same close-on-fail
+contract — a `connect` that fails with `-ECONNREFUSED` /
+`-ETIMEDOUT` / `-EHOSTUNREACH` closes the freshly-opened fd
+before the errno propagates. `connect` blocks until the TCP
+three-way handshake completes; if a bounded connect is
+required the caller sets the socket non-blocking themselves.
 
 ## What is not here — DNS
 
@@ -179,9 +189,9 @@ run `make -C ../../libs/sock` first.
 make test                           # requires python3
 ```
 
-`make test` builds `libsock.a` and `libasm.a`, then runs eight
+`make test` builds `libsock.a` and `libasm.a`, then runs nine
 smoke tests in sequence via the harness in [`test/`](test/).
-Together they call every one of the 31 exported symbols on at
+Together they call every one of the 32 exported symbols on at
 least one success path; every syscall wrapper on at least one
 failure path (which is what actually exercises the macOS
 `SYSCALL_NORM` `neg rax` branch — the success paths never do);
@@ -223,6 +233,16 @@ regression case is sub-check `q` in `inet6-smoke`.
   the socket + setsockopt + bind + listen composition is a
   drop-in replacement for the four-syscall server prologue
   and does not leak the fd on any interior failure.
+- [`client-connect-smoke.asm`](test/client-connect-smoke.asm)
+  — the v1.2 companion. End-to-end loopback in one process:
+  `server_bind_listen` opens a listening fd, `getsockname`
+  reads back the kernel-picked port, `client_connect` sends
+  the SYN — the TCP three-way handshake completes in the
+  kernel's listen queue so `accept` returns immediately with
+  the accepted fd, no threading needed. Sub-check 8
+  additionally exercises the close-on-fail path by
+  `client_connect`-ing to a dead port and asserting the
+  return is negative.
 - [`tcp-smoke.asm`](test/tcp-smoke.asm) + `server.py` —
   end-to-end TCP client. Python loopback server on an ephemeral
   port; assembly client goes through `socket` / `connect` /
@@ -261,6 +281,7 @@ PASS: inet6-smoke    output=[PASS]
 PASS: ipc-smoke      output=[PASS]
 PASS: fail-smoke     output=[PASS]
 PASS: bind-listen-smoke output=[PASS]
+PASS: client-connect-smoke output=[PASS]
 PASS: tcp-smoke      output=[TCP-OK]
 PASS: server-smoke   output=[PORT:<n>]
 PASS: c-smoke        output=[PASS]
@@ -282,9 +303,10 @@ code actually works:
 - [`inet/`](inet/) — 8 pure-computation helpers from POSIX
   `<arpa/inet.h>` (byte-order + IPv4/IPv6 text conversion). No
   kernel calls, no shared header.
-- [`util/`](util/) — v1.1 composed helpers that string several
-  syscall wrappers together into a single call. Currently one
-  entry: `server_bind_listen`.
+- [`util/`](util/) — composed helpers that string several
+  syscall wrappers together into a single call. Two entries
+  as of v1.2: `server_bind_listen` (v1.1) for the inbound
+  side and `client_connect` (v1.2) for the outbound side.
 
 Each exported symbol lives in a same-named file (`socket.asm`
 exports `socket`, `htons.asm` exports `htons`, and so on). The

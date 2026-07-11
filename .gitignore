@@ -16,6 +16,7 @@ libs/sock/test/fail-smoke
 libs/sock/test/tcp-smoke
 libs/sock/test/server-smoke
 libs/sock/test/bind-listen-smoke
+libs/sock/test/client-connect-smoke
 libs/sock/test/c-smoke
 libs/io/test/io-smoke
 libs/io/test/fail-smoke
