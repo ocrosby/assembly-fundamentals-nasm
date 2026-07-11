@@ -20,6 +20,9 @@ libs/io/test/io-smoke
 libs/io/test/fail-smoke
 libs/io/test/c-smoke
 libs/resolv/test/resolv-smoke
+libs/resolv/test/hosts-smoke
+libs/resolv/test/resolvconf-smoke
+libs/resolv/test/hostname-smoke
 libs/resolv/test/fail-smoke
 libs/resolv/test/c-smoke
 
