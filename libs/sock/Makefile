@@ -42,6 +42,11 @@ SRCS += \
     ntohs.asm \
     ntohl.asm
 
+# IPv4 text↔binary.
+SRCS += \
+    inet-pton4.asm \
+    inet-ntop4.asm
+
 OBJS := $(SRCS:.asm=.o)
 
 UNAME_S := $(shell uname -s)
