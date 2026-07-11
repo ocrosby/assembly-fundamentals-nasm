@@ -1,10 +1,11 @@
 # libs/asm/
 
 Formatting and process helpers packaged as the static archive
-`libasm.a`. Three routines: `print_string`, `print_int`, `sys_exit`.
-These exist so future examples can call the helpers without
-re-inlining `sys_write` boilerplate, and so the `%ifdef MACOS` fork
-of the syscall numbers lives in exactly one place.
+`libasm.a`. Four routines: `print_string`, `print_int`,
+`sys_exit`, and `panic`. These exist so future examples can
+call the helpers without re-inlining `sys_write` boilerplate,
+and so the `%ifdef MACOS` fork of the syscall numbers lives
+in exactly one place.
 
 See [`../README.md`](../README.md) for the conventions shared by every
 archive in `libs/` (calling convention, error convention, no-libc
@@ -19,6 +20,7 @@ was the seed of `libs/` and moved down one level when
 | `print_string` | `rdi = buf`, `rsi = len` | `rax` = bytes written | Wraps `sys_write(1, buf, len)`.                                |
 | `print_int`    | `rdi = n` (signed i64)   | none                  | Decimal, handles negatives and `LLONG_MIN`.                    |
 | `sys_exit`     | `rdi = status`           | noreturn              | Hides the `SYS_EXIT` number difference between macOS and Linux.|
+| `panic`        | `rdi = msg`, `rsi = len` | noreturn              | v1.1. Writes `msg` to stderr, then `sys_exit(1)`. Replaces the 8-line write-stderr-then-exit block every `.fail` path was hand-rolling. |
 
 Symbols are exported under their plain names (`print_string`, not
 `_print_string`) on both platforms — the archive is meant for

@@ -1,7 +1,7 @@
 NAME    := asm
 ARCHIVE := lib$(NAME).a
 
-SRCS    := print-string.asm print-int.asm sys-exit.asm
+SRCS    := print-string.asm print-int.asm sys-exit.asm panic.asm
 OBJS    := $(SRCS:.asm=.o)
 
 UNAME_S := $(shell uname -s)
