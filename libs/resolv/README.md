@@ -85,6 +85,43 @@ the v4 layer, then delegate to `resolv_aaaa`. The resolver
 itself is still an IPv4 address; DNS-over-IPv6 transport is a
 separate concern deferred past v1.3.
 
+**v1.4 — multi-resolver failover + `:port` shorthand:**
+
+| Symbol                     | Arguments                                                              | Returns                                    |
+| -------------------------- | ---------------------------------------------------------------------- | ------------------------------------------ |
+| `resolv_conf_read_all`     | `path`, `out_buf*`, `max_count`                                        | count copied (`0..max_count`) or negative errno |
+
+`resolv_conf_read_all` returns every parseable `nameserver`
+directive packed into `out_buf` as consecutive 8-byte entries:
+
+    offset 0..3  u32  IPv4 address (network byte order)
+    offset 4..5  u16  port (host byte order — 53 by default,
+                      or the value from a `nameserver
+                      1.2.3.4:5353` shorthand)
+    offset 6..7  u16  reserved (currently zero)
+
+Zero return means the file was well-formed but held no
+parseable directive — same signal as `resolv_conf_read`'s
+`-ENOENT`, but the `_all` convention uses `0` for empty
+because it is the natural fold of a count-return contract.
+
+`resolv_hostname_at` and `resolv_hostname_at6` now enumerate
+up to eight resolvers with `resolv_conf_read_all` and try
+each in listed order, remembering the last failure. On the
+first success the answer wins; if every resolver fails, the
+LAST failure's errno is returned. The earlier ones are
+discarded intentionally so callers see the most-recent
+attempt's status rather than a cascade of errnos.
+
+The `:port` shorthand is an intentional extension of the
+resolv.conf format. Real system files never use it; libresolv
+supports it so tests and scripted setups can point at
+non-standard resolver ports (a mock server on an ephemeral
+port, a stub resolver on `127.0.0.53:5353`, etc.) without a
+separate configuration path. Malformed suffixes (port `0`,
+port `> 65535`, non-digit characters) cause the WHOLE line
+to be skipped — the parser never returns a partial entry.
+
 `resolv_hostname` is the highest-level entry point for
 production consumers — it composes the /etc/hosts lookup, the
 /etc/resolv.conf parse, and `resolv_a` behind a two-argument
@@ -129,20 +166,15 @@ constant in `resolv-a.asm`. Future work (v1.1) exposes it as a
 
 ## What is not here — yet
 
-v1.3 adds IPv6-aware hosts and hostname entry points on top of
-v1.0's wire primitives, v1.1's file integration, and v1.2's
-AAAA / CNAME support. Still deferred:
+v1.4 adds multi-resolver failover and a `:port` shorthand on
+top of the v1.3 v6 work. Still deferred:
 
 - TCP fallback on the truncated (`TC=1`) response
-- Multiple resolvers with failover — currently only the first
-  `nameserver` in `/etc/resolv.conf` is used
-- Non-standard resolver ports — the `resolv_hostname*` layer
-  assumes 53; `resolv_a` / `resolv_aaaa` still accept an
-  explicit port for custom setups
 - DNS-over-IPv6 transport — the resolver IP itself is still a
   32-bit IPv4 address, even for AAAA queries
 - Search-domain iteration
-- Query retry with backoff across multiple resolvers
+- Per-attempt retry with exponential backoff — currently the
+  iterator makes one attempt per resolver
 - DNSSEC signature validation — would drag crypto into scope
 
 Each of these is a real user story worth writing, but each is
@@ -260,20 +292,28 @@ make test                           # requires python3
   match (`fe80::1`), and cross-family miss (v6 lookup of a
   v4-only name → `-ENOENT`).
 - [`resolvconf-smoke.asm`](test/resolvconf-smoke.asm) —
-  exercises `resolv_conf_read` against a `mktemp`'d
-  /etc/resolv.conf fixture. Three sub-checks: first
-  parseable `nameserver` wins over the commented-out
-  earlier one and the later one, non-existent-file error,
-  no-nameserver-directive miss.
+  exercises `resolv_conf_read` and (v1.4)
+  `resolv_conf_read_all` against `mktemp`'d
+  /etc/resolv.conf fixtures. Seven sub-checks cover: first
+  parseable `nameserver` wins, non-existent-file error,
+  empty-file miss, count-of-two multi-entry parse, empty
+  file returns `0` (not `-ENOENT`) under the count-return
+  convention, `max_count` clamping, and the `:port`
+  shorthand — including that malformed ports (0, > 65535,
+  non-digit) cause the whole line to be silently skipped.
 - [`hostname-smoke.asm`](test/hostname-smoke.asm) —
   end-to-end test of `resolv_hostname_at` and
-  `resolv_hostname_at6`. Four sub-checks: v4 hosts hit
+  `resolv_hostname_at6`. Five sub-checks: v4 hosts hit
   shortcuts DNS (no packet ever sent), v4 hosts miss falls
   through to DNS (which fails because the fixture points at a
   port nothing listens on — the point is that the fall-through
-  *happens*), and the same two paths for the v6 pair. The
-  fall-through error code is not asserted; the AAAA path just
-  needs to end negative.
+  *happens*), the same two paths for the v6 pair, and (v1.4)
+  a two-resolver failover check where a dead entry at
+  `127.0.0.1:1` is skipped and the second entry — a live
+  mock — answers with `libresolv-ok.test → 203.0.113.42`.
+  The failover sub-check exists specifically to prove the
+  hostname layer moves past the first failing resolver rather
+  than giving up immediately.
 - [`c-smoke.c`](test/c-smoke.c) — verifies `libresolv.a` is
   linkable and callable from a C toolchain via `__asm__`
   labels. Encodes a small query (both `QTYPE=A` and

@@ -25,7 +25,7 @@ import socket
 import struct
 import sys
 
-TIMEOUT_SECONDS = 10
+TIMEOUT_SECONDS = 30
 MAX_SERVES = 20
 
 OK_NAME = b"libresolv-ok.test"

@@ -6,31 +6,40 @@
 ;
 ; The composed entry points: look up *name* in the hosts-format
 ; file at *hosts_path* first; if not found, read the
-; resolv.conf-format file at *conf_path* to pick a DNS server,
-; and delegate to resolv_a() (v4) or resolv_aaaa() (v6) over
-; UDP. Both entry points use the same resolver (from
-; /etc/resolv.conf); only the record type queried and the
-; number of bytes written to *out_ip* differ.
+; resolv.conf-format file at *conf_path* to enumerate DNS
+; servers, and try each one in order until one succeeds. The
+; v4 path delegates to resolv_a; the v6 path delegates to
+; resolv_aaaa.
+;
+; v1.4 upgrade over v1.3: instead of reading only the first
+; nameserver from resolv.conf, the composed entry now reads
+; up to MAX_RESOLVERS entries via resolv_conf_read_all and
+; tries them in listed order. On success the answer wins
+; immediately. On a failure (any negative rax from resolv_a /
+; resolv_aaaa), the last errno is remembered and the next
+; resolver is tried. If every resolver fails, the last errno
+; is returned.
 ;
 ; Return convention (all negative on failure):
 ;
 ;   0             *out_ip* populated with the resolved address
 ;                 (4 bytes for _at, 16 bytes for _at6)
-;   -ENOENT       every step reported "not found":
-;                   hosts had no match, resolv.conf had no
-;                   parseable nameserver, or DNS returned
-;                   NXDOMAIN
-;   -ENODATA      resolv.conf yielded a resolver but that
-;                 resolver had no record of the requested
-;                 family (v6 lookup of a v4-only name, etc.)
-;   any other negative errno from the file syscalls or DNS
+;   -ENOENT       hosts miss + resolv.conf held no parseable
+;                 nameserver
+;   -ENODATA      at least one resolver responded but held no
+;                 record of the requested family (passed
+;                 through from resolv_a / resolv_aaaa)
+;   any other negative errno from the file syscalls, socket
+;   layer, or DNS decode step — whichever error the LAST
+;   resolver in the list produced. Earlier failures are lost
+;   intentionally so callers see the most-recent attempt's
+;   errno rather than a cascade.
 ;
 ; The _at suffix mirrors POSIX openat() / fstatat() — this is
-; the parameterized form. Callers that want the standard system
-; paths reach for resolv_hostname / resolv_hostname6 instead
-; (below), which are short wrappers that pass "/etc/hosts" and
-; "/etc/resolv.conf". The parameterized form is what makes the
-; smoke tests possible without touching real system files.
+; the parameterized form. Callers that want the standard
+; system paths reach for resolv_hostname / resolv_hostname6
+; instead (below), which are short wrappers that pass
+; "/etc/hosts" and "/etc/resolv.conf".
 ;
 ; ---- resolv_hostname (name: rdi, out_ip: rsi)
 ; ---- resolv_hostname6(name: rdi, out_ip16: rsi)
@@ -46,7 +55,7 @@
 default rel
 
 extern resolv_hosts_lookup, resolv_hosts_lookup6
-extern resolv_conf_read
+extern resolv_conf_read_all
 extern resolv_a, resolv_aaaa
 
 global resolv_hostname_at
@@ -55,12 +64,41 @@ global resolv_hostname_at6
 global resolv_hostname6
 
 section .rodata
-hosts_path:    db "/etc/hosts", 0
+hosts_path:      db "/etc/hosts", 0
 resolvconf_path: db "/etc/resolv.conf", 0
 
 section .text
 
-%define DNS_PORT 53
+%define MAX_RESOLVERS  8
+%define ENTRY_SIZE     8            ; struct {u32 ip; u16 port; u16 flags;}
+
+; Stack frame for the _at variants:
+;
+;   [rsp+0 ..  +63]   resolver_list: MAX_RESOLVERS entries of
+;                     8 bytes each (u32 ip net, u16 port host,
+;                     u16 flags).
+;   [rsp+64 .. +71]   LAST_ERROR: the errno from the most
+;                     recent resolv_a / resolv_aaaa attempt.
+;                     Left at -ENOENT if no resolver was tried.
+;   [rsp+72 .. +79]   COUNT: how many entries resolv_conf_read_all
+;                     produced (0..MAX_RESOLVERS).
+;
+; Total 80 bytes. Combined with the 5 callee-saved pushes
+; (rbx, rbp, r12, r13, r14) and the return address the frame
+; is 128 bytes — 16-byte aligned before any nested call.
+
+%define LIST_OFF        0
+%define LAST_ERROR_OFF  64
+%define COUNT_OFF       72
+%define FRAME_SIZE      80
+
+; Register roles inside the _at variants:
+;   rbx = hosts_path (unused after step 1)
+;   rbp = conf_path (unused after step 2)
+;   r12 = name
+;   r13 = out_ip (4 or 16 bytes)
+;   r14 = current entry pointer (advances by ENTRY_SIZE)
+;   r15 = end-of-list pointer
 
 ; ---- resolv_hostname_at ----
 resolv_hostname_at:
@@ -69,52 +107,68 @@ resolv_hostname_at:
     push r12
     push r13
     push r14
+    push r15
+    sub rsp, FRAME_SIZE
 
     mov rbx, rdi                    ; hosts_path
     mov rbp, rsi                    ; conf_path
     mov r12, rdx                    ; name
     mov r13, rcx                    ; out_ip
 
+    ; Default last-error to -ENOENT so if step 3 never runs
+    ; (empty resolver list) the caller still sees the v1.3
+    ; "nothing to look this up" signal.
+    mov qword [rsp + LAST_ERROR_OFF], -2
+
     ; ---- 1: try /etc/hosts ----
-    ; resolv_hosts_lookup(hosts_path, name, out_ip)
     mov rdi, rbx
     mov rsi, r12
     mov rdx, r13
     call resolv_hosts_lookup
     test rax, rax
     jz .done                        ; hit — out_ip already written
-
-    ; Not -ENOENT means a real syscall error — propagate.
     cmp rax, -2
-    jne .done
+    jne .done                       ; real syscall error — propagate
 
-    ; ---- 2: read resolv.conf to pick a DNS server ----
-    ; resolv_conf_read(conf_path, &resolver_ip)
-    ; Use r14 (callee-saved) as the resolver-IP staging slot.
-    ; A single dword is enough; we hold it in r14d.
-    sub rsp, 8                      ; scratch slot for resolver IP
+    ; ---- 2: enumerate resolvers via /etc/resolv.conf ----
     mov rdi, rbp
-    mov rsi, rsp
-    call resolv_conf_read
+    lea rsi, [rsp + LIST_OFF]
+    mov edx, MAX_RESOLVERS
+    call resolv_conf_read_all
     test rax, rax
-    jnz .after_conf_read            ; failure — propagate
-
-    mov r14d, [rsp]                 ; resolver IP (net order)
-
-.after_conf_read:
-    add rsp, 8
+    js .done                        ; syscall error — propagate
+    mov [rsp + COUNT_OFF], rax
     test rax, rax
-    jnz .done                       ; propagate the resolv_conf error
+    jz .done                        ; empty list — LAST_ERROR is -ENOENT
 
-    ; ---- 3: resolv_a(name, resolver, port=53, out_ip) ----
+    ; Cursor and end. Each entry is 8 bytes.
+    lea r14, [rsp + LIST_OFF]
+    lea r15, [r14 + rax * ENTRY_SIZE]
+
+.try_next_v4:
+    cmp r14, r15
+    jae .exhausted
+
+    ; resolv_a(name, resolver_ip, port, out_ip)
     mov rdi, r12
-    mov esi, r14d
-    mov edx, DNS_PORT
+    mov esi, [r14 + 0]              ; ip (u32 net)
+    movzx edx, word [r14 + 4]       ; port (u16 host)
     mov rcx, r13
     call resolv_a
-    ; whatever resolv_a returned is our answer
+    test rax, rax
+    jz .done                        ; hit
+
+    ; Remember error, try next.
+    mov [rsp + LAST_ERROR_OFF], rax
+    add r14, ENTRY_SIZE
+    jmp .try_next_v4
+
+.exhausted:
+    mov rax, [rsp + LAST_ERROR_OFF]
 
 .done:
+    add rsp, FRAME_SIZE
+    pop r15
     pop r14
     pop r13
     pop r12
@@ -124,30 +178,28 @@ resolv_hostname_at:
 
 ; ---- resolv_hostname ----
 resolv_hostname:
-    ; Rewire args: (name, out_ip) -> (hosts, conf, name, out_ip).
     mov rdx, rdi                    ; name -> arg 3
     mov rcx, rsi                    ; out_ip -> arg 4
     lea rdi, [hosts_path]
     lea rsi, [resolvconf_path]
-    jmp resolv_hostname_at          ; tail call
+    jmp resolv_hostname_at
 
 ; ---- resolv_hostname_at6 ----
-; Same shape as resolv_hostname_at, but hits the v6-aware
-; hosts lookup and delegates to resolv_aaaa on the DNS
-; fallback. The resolver itself is still an IPv4 address
-; (DNS-over-IPv6 is a separate transport concern); only the
-; answer QTYPE changes.
 resolv_hostname_at6:
     push rbx
     push rbp
     push r12
     push r13
     push r14
+    push r15
+    sub rsp, FRAME_SIZE
 
-    mov rbx, rdi                    ; hosts_path
-    mov rbp, rsi                    ; conf_path
-    mov r12, rdx                    ; name
-    mov r13, rcx                    ; out_ip16
+    mov rbx, rdi
+    mov rbp, rsi
+    mov r12, rdx
+    mov r13, rcx
+
+    mov qword [rsp + LAST_ERROR_OFF], -2
 
     ; ---- 1: try /etc/hosts (v6 lines only) ----
     mov rdi, rbx
@@ -155,31 +207,47 @@ resolv_hostname_at6:
     mov rdx, r13
     call resolv_hosts_lookup6
     test rax, rax
-    jz .done                        ; hit — out_ip16 already written
+    jz .done
     cmp rax, -2
-    jne .done                       ; real syscall error — propagate
+    jne .done
 
-    ; ---- 2: read resolv.conf to pick a DNS server ----
-    sub rsp, 8                      ; scratch slot for resolver IP
+    ; ---- 2: enumerate resolvers ----
     mov rdi, rbp
-    mov rsi, rsp
-    call resolv_conf_read
+    lea rsi, [rsp + LIST_OFF]
+    mov edx, MAX_RESOLVERS
+    call resolv_conf_read_all
     test rax, rax
-    jnz .after_conf_read
-    mov r14d, [rsp]                 ; resolver IP (net order)
-.after_conf_read:
-    add rsp, 8
+    js .done
+    mov [rsp + COUNT_OFF], rax
     test rax, rax
-    jnz .done                       ; propagate resolv_conf error
+    jz .done
 
-    ; ---- 3: resolv_aaaa(name, resolver, port=53, out_ip16) ----
+    lea r14, [rsp + LIST_OFF]
+    lea r15, [r14 + rax * ENTRY_SIZE]
+
+.try_next_v6:
+    cmp r14, r15
+    jae .exhausted
+
+    ; resolv_aaaa(name, resolver_ip, port, out_ip16)
     mov rdi, r12
-    mov esi, r14d
-    mov edx, DNS_PORT
+    mov esi, [r14 + 0]
+    movzx edx, word [r14 + 4]
     mov rcx, r13
     call resolv_aaaa
+    test rax, rax
+    jz .done
+
+    mov [rsp + LAST_ERROR_OFF], rax
+    add r14, ENTRY_SIZE
+    jmp .try_next_v6
+
+.exhausted:
+    mov rax, [rsp + LAST_ERROR_OFF]
 
 .done:
+    add rsp, FRAME_SIZE
+    pop r15
     pop r14
     pop r13
     pop r12
@@ -189,8 +257,8 @@ resolv_hostname_at6:
 
 ; ---- resolv_hostname6 ----
 resolv_hostname6:
-    mov rdx, rdi                    ; name -> arg 3
-    mov rcx, rsi                    ; out_ip16 -> arg 4
+    mov rdx, rdi
+    mov rcx, rsi
     lea rdi, [hosts_path]
     lea rsi, [resolvconf_path]
-    jmp resolv_hostname_at6         ; tail call
+    jmp resolv_hostname_at6

@@ -43,6 +43,11 @@ extern long resolv_hostname_at6(const char *hosts, const char *conf,
 extern long resolv_hostname6(const char *name,
                               unsigned char *out16) __asm__("resolv_hostname6");
 
+/* v1.4: multi-nameserver enumeration. Each entry is 8 bytes —
+ * u32 ip (net order), u16 port (host order), u16 flags (0). */
+extern long resolv_conf_read_all(const char *path, void *out_buf,
+                                  size_t max_count) __asm__("resolv_conf_read_all");
+
 static int fail(int id) {
     fprintf(stderr, "FAIL:%d\n", id);
     return 1;
@@ -102,6 +107,14 @@ int main(void) {
      * enough to fail the link if the symbol is missing. */
     long (* volatile sink)(const char *, unsigned char *) = resolv_hostname6;
     (void)sink;
+
+    /* 9: resolv_conf_read_all on a missing file returns a
+     * negative errno (matches the -read convention). Proves
+     * the v1.4 symbol is exported and respects the errno
+     * contract. */
+    unsigned char entries[64] = {0};
+    if (resolv_conf_read_all("/proc/libresolv/does-not-exist-",
+                              entries, 8) >= 0) return fail(11);
 
     puts("PASS");
     return 0;
