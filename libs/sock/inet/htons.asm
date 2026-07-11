@@ -5,8 +5,6 @@
 ; are zeroed. On any little-endian host htons() and ntohs() are
 ; the same operation.
 
-%include "syscall.inc"
-
 default rel
 
 global htons

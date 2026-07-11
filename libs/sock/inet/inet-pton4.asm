@@ -19,8 +19,6 @@
 ; No allocations, no syscalls. All work happens in registers and
 ; a five-slot push/pop frame.
 
-%include "syscall.inc"
-
 default rel
 
 global inet_pton4

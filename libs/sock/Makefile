@@ -1,55 +1,14 @@
 NAME    := sock
 ARCHIVE := lib$(NAME).a
 
-# Connection lifecycle.
-SRCS := \
-    socket.asm \
-    bind.asm \
-    listen.asm \
-    accept.asm \
-    connect.asm \
-    shutdown.asm \
-    close.asm
-
-# I/O.
-SRCS += \
-    read.asm \
-    write.asm \
-    send.asm \
-    recv.asm \
-    sendto.asm \
-    recvfrom.asm \
-    sendmsg.asm \
-    recvmsg.asm
-
-# Options and introspection.
-SRCS += \
-    getsockopt.asm \
-    setsockopt.asm \
-    getsockname.asm \
-    getpeername.asm \
-    socketpair.asm
-
-# Multiplexing.
-SRCS += \
-    select.asm \
-    poll.asm
-
-# Byte-order helpers.
-SRCS += \
-    htons.asm \
-    htonl.asm \
-    ntohs.asm \
-    ntohl.asm
-
-# IPv4 / IPv6 text↔binary.
-SRCS += \
-    inet-pton4.asm \
-    inet-ntop4.asm \
-    inet-pton6.asm \
-    inet-ntop6.asm
-
-OBJS := $(SRCS:.asm=.o)
+# syscall/ holds the direct kernel-syscall wrappers plus their
+# shared syscall.inc header. inet/ holds the pure-computation
+# helpers from <arpa/inet.h> — byte-order and text↔binary
+# routines that never enter the kernel.
+SYSCALL_SRCS := $(wildcard syscall/*.asm)
+INET_SRCS    := $(wildcard inet/*.asm)
+SRCS         := $(SYSCALL_SRCS) $(INET_SRCS)
+OBJS         := $(SRCS:.asm=.o)
 
 UNAME_S := $(shell uname -s)
 ifeq ($(UNAME_S),Darwin)
@@ -67,9 +26,15 @@ build: $(OBJS)
 $(ARCHIVE): $(OBJS)
 	ar rcs $(ARCHIVE) $(OBJS)
 
-# Every wrapper %include's syscall.inc, so rebuild all .o files
-# when the shared header changes.
-%.o: %.asm syscall.inc
+# Syscall wrappers %include "syscall.inc". -I syscall/ lets NASM
+# resolve the include regardless of the source-file working
+# directory. The dependency on syscall.inc forces every wrapper
+# to rebuild when the shared header changes.
+syscall/%.o: syscall/%.asm syscall/syscall.inc
+	nasm $(NASM_FLAGS) -I syscall/ $< -o $@
+
+# inet/ helpers are self-contained — no shared header, no syscall.
+inet/%.o: inet/%.asm
 	nasm $(NASM_FLAGS) $< -o $@
 
 # Smoke-test the socket path end to end: build this archive and

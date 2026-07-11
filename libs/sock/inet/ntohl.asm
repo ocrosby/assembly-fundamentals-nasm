@@ -2,8 +2,6 @@
 ;
 ; Inverse of htonl(); byte-identical on a little-endian host.
 
-%include "syscall.inc"
-
 default rel
 
 global ntohl

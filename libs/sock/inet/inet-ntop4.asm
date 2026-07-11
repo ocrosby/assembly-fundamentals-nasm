@@ -14,8 +14,6 @@
 ; No syscalls, no allocations. Uses div for the byte-to-decimal
 ; step; the conversion runs at most four times per call.
 
-%include "syscall.inc"
-
 ; Emit the decimal representation of al (0..255) into [r13] and
 ; advance r13 past the written digits. Uses %%-scoped local
 ; labels so it can expand once per octet without conflict.

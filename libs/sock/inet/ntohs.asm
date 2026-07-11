@@ -3,8 +3,6 @@
 ; Inverse of htons(). On a little-endian x86-64 host both
 ; directions are byte-identical.
 
-%include "syscall.inc"
-
 default rel
 
 global ntohs

@@ -28,8 +28,6 @@
 ; shifting the "after" groups to the tail of the 16-byte output
 ; and zero-filling the gap. This keeps *dst untouched on failure.
 
-%include "syscall.inc"
-
 default rel
 
 global inet_pton6

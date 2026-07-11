@@ -19,8 +19,6 @@
 ; Returns NULL if `size` is smaller. On success returns the
 ; original `dst`.
 
-%include "syscall.inc"
-
 default rel
 
 global inet_ntop6

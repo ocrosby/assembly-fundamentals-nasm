@@ -3,8 +3,6 @@
 ; Converts a u32 from host to network byte order. The upper 32
 ; bits of rax are zeroed by the mov into eax.
 
-%include "syscall.inc"
-
 default rel
 
 global htonl

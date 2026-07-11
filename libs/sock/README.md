@@ -175,11 +175,21 @@ run `make -C ../../libs/sock` first.
 
 ## Source layout
 
+Wrappers are split into two subdirectories that mirror how the
+code actually works:
+
+- `syscall/` — the 22 kernel-syscall wrappers, plus their shared
+  `syscall.inc` header. Every file in this directory is a
+  three-to-five instruction shim over a single syscall.
+- `inet/` — the 8 pure-computation helpers from POSIX
+  `<arpa/inet.h>`: `htons`, `htonl`, `ntohs`, `ntohl`,
+  `inet_pton4`, `inet_ntop4`, `inet_pton6`, `inet_ntop6`. None
+  of these enter the kernel and none depend on `syscall.inc`.
+
 Each exported symbol lives in a same-named file (`socket.asm`
-exports `socket`, `bind.asm` exports `bind`, and so on). The one
-exception is `syscall.inc`, a shared header included by every
-wrapper for the per-platform `SYS_*` numbers and the
-`SYSCALL_NORM` / `SYSCALL_ARG4` macros described above.
+exports `socket`, `htons.asm` exports `htons`, and so on). The
+archive `libsock.a` is flat by symbol regardless of source
+layout, so consumers still `extern` and link the same way.
 
 ## See also
 
