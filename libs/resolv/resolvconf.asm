@@ -45,14 +45,22 @@ section .text
 %define O_RDONLY   0
 %define BUF_SIZE   4096
 
-; Stack layout:
-;   [rsp .. rsp+15]        scratch: parsed IP + line-end restore
-;   [rsp+16 .. rsp+4112]   the 4096-byte read buffer
-;   total: 4112 bytes (aligned to 16)
+; Stack layout — split for the same reason hosts.asm splits it:
+; the outer function's LINE_END_ADDR slot must not overlap with
+; inet_pton4's 4-byte output slot, or the pointer we save gets
+; overwritten by the parsed IP and the byte-restore step blows
+; up on a corrupted address.
+;
+;   [rsp+0 .. rsp+7]       LINE_END_ADDR
+;   [rsp+8]                LINE_END_BYTE
+;   [rsp+16 .. rsp+19]     IP_SCRATCH (inet_pton4 output)
+;   [rsp+32 .. rsp+4128]   read buffer
 
-%define IP_SCRATCH   0
-%define BUF_OFF      16
-%define STACK_SIZE   4112
+%define LINE_END_ADDR  0
+%define LINE_END_BYTE  8
+%define IP_SCRATCH     16
+%define BUF_OFF        32
+%define STACK_SIZE     4128
 
 ; Register roles:
 ;   r12 = buffer base
@@ -114,18 +122,20 @@ resolv_conf_read:
 
     ; Save the terminator byte and NUL-terminate the line.
     mov al, [rcx]
-    mov [rsp + IP_SCRATCH + 8], al
-    mov [rsp + IP_SCRATCH], rcx
+    mov [rsp + LINE_END_BYTE], al
+    mov [rsp + LINE_END_ADDR], rcx
     mov byte [rcx], 0
 
     ; Try to match "nameserver <ip>".
     call .try_line
     mov r8d, eax                    ; save verdict
 
-    ; Restore the byte we clobbered.
-    mov rcx, [rsp + IP_SCRATCH]
-    mov al, [rsp + IP_SCRATCH + 8]
-    mov [rcx], al
+    ; Restore the byte we clobbered. Use dl not al — using al
+    ; would overwrite the low byte of rax, which .try_line
+    ; returned as our match verdict and we test just below.
+    mov rcx, [rsp + LINE_END_ADDR]
+    mov dl, [rsp + LINE_END_BYTE]
+    mov [rcx], dl
 
     test r8d, r8d
     jnz .hit

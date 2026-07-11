@@ -67,13 +67,27 @@ section .text
 ;   rbp  = saved fd (once open succeeds)
 
 ; Stack layout:
-;   [rsp .. rsp+15]        scratch: parsed IP + line-end saved offsets
-;   [rsp+16 .. rsp+4112]   the 4096-byte read buffer
-;   total: 4112 bytes (aligned to 16)
+;   [rsp+0  .. rsp+7]      LINE_END_ADDR: address of the LF (or
+;                          buffer end) we NUL-terminated for the
+;                          current line — 8-byte pointer
+;   [rsp+8]                LINE_END_BYTE: the byte we clobbered
+;                          (usually 0x0A) — 1 byte
+;   [rsp+16 .. rsp+19]     IP_SCRATCH: inet_pton4's 4-byte output
+;                          slot. Deliberately disjoint from the
+;                          line-end save above — an earlier
+;                          revision aliased them and inet_pton4
+;                          would trash the low half of the saved
+;                          pointer, then the outer's `mov [rcx],
+;                          al` restore would SIGSEGV on the
+;                          corrupted address.
+;   [rsp+20 .. rsp+31]     padding for 16-byte alignment
+;   [rsp+32 .. rsp+4128]   4096-byte read buffer
 
-%define IP_SCRATCH   0
-%define BUF_OFF      16
-%define STACK_SIZE   4112
+%define LINE_END_ADDR  0
+%define LINE_END_BYTE  8
+%define IP_SCRATCH     16
+%define BUF_OFF        32
+%define STACK_SIZE     4128
 
 resolv_hosts_lookup:
     push rbx
@@ -138,17 +152,22 @@ resolv_hosts_lookup:
 
     ; Save the byte we are about to clobber and NUL-terminate.
     mov al, [rcx]
-    mov [rsp + IP_SCRATCH + 8], al  ; save byte value
-    mov [rsp + IP_SCRATCH], rcx     ; save its address for restore
+    mov [rsp + LINE_END_BYTE], al   ; save byte value
+    mov [rsp + LINE_END_ADDR], rcx  ; save its address for restore
     mov byte [rcx], 0
 
     ; Walk this line and try to match. r13 = start, rcx = end.
     call .try_line
 
-    ; Restore the byte and advance past LF.
-    mov rcx, [rsp + IP_SCRATCH]
-    mov al, [rsp + IP_SCRATCH + 8]
-    mov [rcx], al
+    ; Restore the byte and advance past LF. Use dl for the
+    ; byte load — using al would overwrite rax's low byte and
+    ; turn a `.try_line` return of 0 (no match) into a nonzero
+    ; value (the saved LF byte, 0x0A), which then falsely fires
+    ; the `jnz .hit` check below and returns success with an
+    ; uninitialized out_ip.
+    mov rcx, [rsp + LINE_END_ADDR]
+    mov dl, [rsp + LINE_END_BYTE]
+    mov [rcx], dl
 
     ; If the line matched, .try_line already wrote out_ip and
     ; returned 1 in rdi (used as a scratch flag here). Check.
