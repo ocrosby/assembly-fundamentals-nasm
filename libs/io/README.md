@@ -560,6 +560,15 @@ sit on top of one or more syscall wrappers. Currently:
   `+21`, Linux `+19`) offsets behind an
   `open`/`next`/`close` triple whose state lives in a
   caller-allocated opaque block.
+- [`file_write_all`](util/file-write-all.asm) *(v1.13)* —
+  `file_write_all(path, addr, size)` dumps a caller-owned
+  buffer into a fresh file at `path`, creating or truncating
+  the destination as needed. Handles short writes internally
+  by looping in userspace (matching libsock's `send_all`
+  pattern). Symmetric counterpart to `file_read_all`: one
+  gives you a file as a buffer, the other writes a buffer as
+  a file. `size = 0` is legal and still creates/truncates
+  the destination.
 - [`file_read_all`](util/file-read-all.asm) *(v1.12)* —
   `file_read_all(path, out_addr, out_size)` returns a
   PROT_READ MAP_PRIVATE view of the whole file as one
