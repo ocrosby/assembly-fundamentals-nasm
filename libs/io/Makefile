@@ -41,12 +41,14 @@ util/%.o: util/%.asm syscall/syscall.inc
 	nasm $(NASM_FLAGS) -I .. -I syscall/ $< -o $@
 
 # Smoke-test the file-syscall path end to end: build this archive
-# and libsock.a (its read/write/close are reused by the smoke
-# tests) and libasm.a, then run the harness. Invoked via bash so
-# no exec bit is required on run.sh.
+# and its co-dependencies, then run the harness. libsock (for
+# read/write/close in the smokes), libasm (panic in .fail), and
+# libstr (memcmp in iov-smoke). Invoked via bash so no exec bit
+# is required on run.sh.
 test: $(ARCHIVE)
 	$(MAKE) -C ../sock
 	$(MAKE) -C ../asm
+	$(MAKE) -C ../str
 	bash ./test/run.sh
 
 clean:

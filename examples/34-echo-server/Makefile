@@ -3,11 +3,11 @@ SRC     := $(NAME).asm
 OBJ     := $(NAME).o
 BIN     := $(NAME)
 
-# Uses read (libio) or read from libsock — read/write live in
-# libsock. socket, bind, listen, accept, connect, close,
-# getsockname, send_all all live in libsock. fork/wait4 live
-# in libproc.
-LIBS    := ../../libs/sock/libsock.a ../../libs/proc/libproc.a
+# socket, bind, listen, accept, connect, close, getsockname,
+# read, and send_all all live in libsock. fork/wait4 live in
+# libproc. memcmp (verifying the echoed "HELLO WORLD!") lives
+# in libstr.
+LIBS    := ../../libs/sock/libsock.a ../../libs/proc/libproc.a ../../libs/str/libstr.a
 
 UNAME_S := $(shell uname -s)
 ifeq ($(UNAME_S),Darwin)
@@ -31,6 +31,7 @@ link: $(BIN)
 libs $(LIBS):
 	$(MAKE) -C ../../libs/sock
 	$(MAKE) -C ../../libs/proc
+	$(MAKE) -C ../../libs/str
 
 $(OBJ): $(SRC)
 	nasm $(NASM_FLAGS) $(SRC) -o $(OBJ)

@@ -39,8 +39,10 @@ esac
 # smokes that call into libasm's `panic` (v1.1) via their `.fail`
 # path — inert for the ones that still hand-roll the write+exit
 # sequence, since the linker only pulls in objects referenced by an
-# unresolved symbol. io-smoke also needs a runtime tmpfile.
-libs=(../libio.a ../../asm/libasm.a)
+# unresolved symbol. libstr.a follows the same logic for iov-smoke's
+# memcmp calls: inert for the smokes that do not use libstr.
+# io-smoke also needs a runtime tmpfile.
+libs=(../libio.a ../../asm/libasm.a ../../str/libstr.a)
 
 tmpfile="$(mktemp /tmp/libio-smoke.XXXXXX)"
 # Reserve a distinct scratch DIR path — mktemp -d would create it,

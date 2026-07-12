@@ -35,21 +35,13 @@
 %define BACKLOG      1
 %define BUF_SIZE     64
 
-; "HELLO WORLD!" — 12 bytes. Compared in the child as three
-; little-endian dwords instead of a byte loop. Layout:
-;   bytes  0..3 = 'H','E','L','L' (0x48,0x45,0x4C,0x4C) → 0x4C4C4548
-;   bytes  4..7 = 'O',' ','W','O' (0x4F,0x20,0x57,0x4F) → 0x4F57204F
-;   bytes  8..11= 'R','L','D','!' (0x52,0x4C,0x44,0x21) → 0x21444C52
-%define HELLO_DW0    0x4C4C4548
-%define HELLO_DW1    0x4F57204F
-%define HELLO_DW2    0x21444C52
-
 default rel
 
 extern socket, bind, listen, accept, connect, close
 extern read, send_all
 extern getsockname
 extern fork, wait4
+extern memcmp                       ; libstr v1.0
 
 global _start
 global _main
@@ -233,14 +225,16 @@ _main:
     sub r13, rax
     jnz .recv_loop
 
-    ; Verify "HELLO WORLD!" — three dword compares.
-    ; buf layout: 'H','E','L','L' | 'O',' ','W','O' | 'R','L','D','!'
-    cmp dword [buf + 0], HELLO_DW0
-    jne .fail
-    cmp dword [buf + 4], HELLO_DW1
-    jne .fail
-    cmp dword [buf + 8], HELLO_DW2
-    jne .fail
+    ; Verify "HELLO WORLD!" — one memcmp against the sender's
+    ; own reference string. Prior versions unrolled this into
+    ; three little-endian dword compares; libstr's memcmp
+    ; collapses the compare back into one intent-shaped call.
+    lea rdi, [buf]
+    lea rsi, [msg]
+    mov edx, msg_len                ; 12
+    call memcmp
+    test rax, rax
+    jnz .fail
 
     ; close + _exit(0) — closing the write side sends FIN,
     ; which makes the parent's read return 0 and end the
