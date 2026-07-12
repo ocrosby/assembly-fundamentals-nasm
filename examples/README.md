@@ -49,6 +49,7 @@ vocabulary needed for the early chapters of [../docs/](../docs/).
 | 38 | [38-signal-block](38-signal-block/)                  | first libsig user — block SIGPIPE, write to a broken pipe, observe pending | —                                             |
 | 39 | [39-number-store](39-number-store/)                  | itoa + atoi round-trip through `file_write_all` and `file_read_all`   | —                                             |
 | 40 | [40-fork-signal](40-fork-signal/)                    | first libproc `kill` user — fork, SIGTERM, wait4 status decode      | —                                             |
+| 41 | [41-logger](41-logger/)                              | full libio I/O family — `file_write_all` + `file_append` + `file_read_all` | —                                             |
 
 Examples 1 and 2 do not have a dedicated chapter — they are the
 smallest possible programs and exist so that every later example can
