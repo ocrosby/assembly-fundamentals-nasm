@@ -5,7 +5,8 @@ ARCHIVE := lib$(NAME).a
 # Everything sits in the top level of libs/str/ the same way
 # libs/asm/ does. `asm/` predates libstr; the layouts converge.
 SRCS    := memcpy.asm memset.asm memcmp.asm memchr.asm \
-           strlen.asm strcmp.asm strncmp.asm strchr.asm strcpy.asm
+           strlen.asm strcmp.asm strncmp.asm strchr.asm strcpy.asm \
+           atoi.asm itoa.asm
 OBJS    := $(SRCS:.asm=.o)
 
 UNAME_S := $(shell uname -s)

@@ -31,7 +31,7 @@ All archives in this directory share the same conventions:
 | [`resolv/`](resolv/) | `libresolv.a` | DNS A-record resolver over UDP. Wire encode / decode plus a `resolv_a(name, resolver, port, out_ip)` entry point built on `libsock`, a `resolv_sockaddr` composed helper that returns a filled `struct sockaddr_in`, and a `resolv_dial` composed helper that returns a connected fd. |
 | [`time/`](time/)  | `libtime.a` | Wall-clock and CPU-time primitives from `<sys/time.h>` / `<sys/resource.h>` — `gettimeofday`, `sleep_ms`, `getrusage`, plus `time_diff_us`, `now_ms`, and `monotonic_ms` util helpers. `monotonic_ms` is deliberately asymmetric: Linux uses `clock_gettime(CLOCK_MONOTONIC, ...)`, macOS returns `-ENOSYS`. |
 | [`proc/`](proc/)  | `libproc.a` | Process control from `<unistd.h>` / `<sys/wait.h>` / `<signal.h>` — `fork`, `execve`, `wait4`, `getpid`, `getppid`, `kill`, plus a `spawn_wait` composed helper. |
-| [`str/`](str/)    | `libstr.a`  | Byte-manipulation helpers (`memcpy`, `memset`, `memcmp`, `memchr`, `strlen`, `strcmp`, `strncmp`, `strchr`, `strcpy`). Pure computation — no syscalls, no per-platform paths. |
+| [`str/`](str/)    | `libstr.a`  | Byte-manipulation helpers (`memcpy`, `memset`, `memcmp`, `memchr`, `strlen`, `strcmp`, `strncmp`, `strchr`, `strcpy`) plus decimal integer conversion (`atoi`, `itoa`). Pure computation — no syscalls, no per-platform paths. |
 | [`sig/`](sig/)    | `libsig.a`  | POSIX signal-mask primitives — `sigprocmask` and `sigpending`. Both syscalls take a `sigsetsize` argument on Linux (injected internally); macOS SIG_* how values also differ from Linux and are normalized in `syscall.inc`. |
 
 Each subdirectory's `README.md` documents the exported symbols and
