@@ -1,4 +1,4 @@
-NAME    := poll-pipe
+NAME    := poll
 SRC     := $(NAME).asm
 OBJ     := $(NAME).o
 BIN     := $(NAME)

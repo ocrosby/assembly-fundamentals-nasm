@@ -1,4 +1,4 @@
-# 48 — flock-mutex
+# 48 — flock
 
 Show `flock(2)` as a filesystem-backed mutex. Parent opens a
 lock file, acquires `LOCK_EX`, forks. Child opens the same
