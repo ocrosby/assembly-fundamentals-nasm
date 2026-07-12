@@ -560,6 +560,17 @@ sit on top of one or more syscall wrappers. Currently:
   `+21`, Linux `+19`) offsets behind an
   `open`/`next`/`close` triple whose state lives in a
   caller-allocated opaque block.
+- [`file_read_all`](util/file-read-all.asm) *(v1.12)* —
+  `file_read_all(path, out_addr, out_size)` returns a
+  PROT_READ MAP_PRIVATE view of the whole file as one
+  contiguous buffer, plus its size. Opens the file, reads
+  the size via `io_size`, mmaps the file, closes the fd
+  (the mapping outlives the fd on both platforms), and
+  writes `*out_addr` and `*out_size`. Ownership contract:
+  the caller is responsible for `munmap(addr, size)` when
+  done. Zero-length files return `addr = NULL`, `size = 0`
+  so callers get a clear sentinel rather than a
+  platform-specific `mmap(len=0)` wart.
 - [`file_copy`](util/file-copy.asm) *(v1.11)* —
   `file_copy(src_path, dst_path)` folds the two-mmap file
   copy pattern (see
