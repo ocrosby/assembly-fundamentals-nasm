@@ -112,6 +112,7 @@ jobs:
             [47-timing]=42
             [48-flock]=42
             [49-poll]=42
+            [50-growable-buf]=42
           )
           # Examples that read from stdin get an empty pipe so they hit
           # EOF immediately and exit 0 without waiting for a TTY.
@@ -119,6 +120,7 @@ jobs:
             [05-read-char]=1
             [06-read-line]=1
             [08-echo-loop]=1
+            [50-growable-buf]=1
           )
           fail=0
           for dir in "${!expected[@]}"; do
@@ -172,3 +174,7 @@ jobs:
       - name: Build and smoke-test the signal library
         shell: bash
         run: make -C libs/sig test
+
+      - name: Build and smoke-test the buffer library
+        shell: bash
+        run: make -C libs/buf test

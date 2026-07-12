@@ -59,6 +59,7 @@ archives under [../libs/](../libs/).
 | 47 | [47-timing](47-timing/)                              | first libtime user as star — `now_ms` bracket around `sleep_ms(50)`  | —                                             |
 | 48 | [48-flock](48-flock/)                                | `flock` as filesystem mutex — parent holds, child's `LOCK_NB` sees `-EWOULDBLOCK` | —                                             |
 | 49 | [49-poll](49-poll/)                                  | first `poll` user — one pipe, one struct pollfd, timeout then `POLLIN` ready | —                                             |
+| 50 | [50-growable-buf](50-growable-buf/)                  | first `libbuf` user — slurp stdin into an mmap-backed growable buffer, one big write on flush | —                                             |
 
 Examples 1 and 2 do not have a dedicated chapter — they are the
 smallest possible programs and exist so that every later example can
