@@ -31,7 +31,10 @@ case "$(uname -s)" in
         ;;
 esac
 
-libs=(../libtime.a)
+# libasm.a joins the link line for time-smoke's `panic` call in
+# the .fail path. Inert on the happy path — the linker only
+# pulls in objects for unresolved symbols.
+libs=(../libtime.a ../../asm/libasm.a)
 fail_total=0
 
 # ---------------------------------------------------------------

@@ -40,9 +40,11 @@ syscall/%.o: syscall/%.asm syscall/syscall.inc
 util/%.o: util/%.asm syscall/syscall.inc
 	nasm $(NASM_FLAGS) -I .. -I syscall/ $< -o $@
 
-# Smoke-test the archive end to end. Invoked via bash so no exec
-# bit is required on run.sh.
+# Smoke-test the archive end to end. libasm.a joins the co-deps
+# for time-smoke's panic call in the .fail path. Invoked via
+# bash so no exec bit is required on run.sh.
 test: $(ARCHIVE)
+	$(MAKE) -C ../asm
 	bash ./test/run.sh
 
 clean:
