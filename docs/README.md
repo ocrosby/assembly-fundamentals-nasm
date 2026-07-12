@@ -82,6 +82,12 @@ A progressive walkthrough of x86-64 assembly with NASM. Each guide is intentiona
   header, UDP → TCP truncation retry, and the
   `/etc/resolv.conf` + `/etc/hosts` walk that mirrors
   POSIX `getaddrinfo`.
+- [Multiplexing with poll](35-multiplexing.md) — the
+  `struct pollfd` layout, timeout semantics, the events
+  that matter (`POLLIN` / `POLLOUT` / `POLLHUP`), the
+  three things poll does not tell you, and why libsock
+  stops at poll rather than shipping `epoll` / `kqueue`
+  wrappers.
 
 ## Appendix
 
