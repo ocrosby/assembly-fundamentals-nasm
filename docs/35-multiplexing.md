@@ -104,6 +104,10 @@ they belong in the caller, not the archive.
   every non-trivial poll loop wraps around.
 - [`33-time.md`](33-time.md) — `sleep_ms` is `poll(NULL, 0, ms)`,
   the same syscall used as a timer.
+- [`37-nonblocking.md`](37-nonblocking.md) — the
+  `O_NONBLOCK` half of the event-loop pattern: poll tells
+  you *when* an fd is ready, non-blocking I/O lets you act
+  on it without ever committing to a wait.
 - [`examples/46-nonblock`](../examples/46-nonblock/) — the
   reason poll matters: once `O_NONBLOCK` is set, a
   would-be-blocking read returns `-EAGAIN` and you need a

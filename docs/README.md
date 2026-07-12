@@ -93,6 +93,11 @@ A progressive walkthrough of x86-64 assembly with NASM. Each guide is intentiona
   mandatory distinction, why the per-open-file-
   description scope makes `flock` the safer default over
   `fcntl` POSIX locks, and non-blocking acquisition.
+- [Non-blocking I/O](37-nonblocking.md) — what
+  `O_NONBLOCK` does to `read` / `write` / `accept` /
+  `connect`, the `F_GETFL` / `F_SETFL` read-modify-write
+  dance, why `-EAGAIN` is the whole point, and how
+  non-blocking + `poll` becomes an event loop.
 
 ## Appendix
 
