@@ -45,7 +45,7 @@ vocabulary needed for the early chapters of [../docs/](../docs/).
 | 34 | [34-echo-server](34-echo-server/)                    | TCP echo loop with `send_all` — first real user of libsock v1.4         | —                                             |
 | 35 | [35-mmap-copy](35-mmap-copy/)                        | two live mmaps — file→file copy in userspace, no read/write for the transfer | —                                             |
 | 36 | [36-file-copy](36-file-copy/)                        | `file_copy` composed helper — 35 shows how, 36 shows use            | —                                             |
-| 37 | [37-config-load](37-config-load/)                    | libio + libstr on the same buffer — `file_read_all` + `strchr` + `memcmp` | —                                             |
+| 37 | [37-config-load](37-config-load/)                    | libio + libstr on the same buffer — `file_read_all` + `memcmp` + `strchr` + `atoi` | —                                             |
 | 38 | [38-signal-block](38-signal-block/)                  | first libsig user — block SIGPIPE, write to a broken pipe, observe pending | —                                             |
 | 39 | [39-number-store](39-number-store/)                  | itoa + atoi round-trip through `file_write_all` and `file_read_all`   | —                                             |
 
