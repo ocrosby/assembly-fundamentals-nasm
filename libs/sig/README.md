@@ -13,6 +13,20 @@ follows.
 
 ## Version
 
+**v1.2** — `sigaction` wrapper for the SIG_IGN / SIG_DFL
+dispositions. Callers can now say "ignore SIGPIPE" without
+the sigprocmask block-mask dance
+([`38-signal-block`](../../examples/38-signal-block/) uses
+the older pattern; consumers who prefer disposition-style
+now reach for `sigaction`). Real handler functions still
+require a per-platform userspace trampoline (SA_RESTORER on
+Linux, sa_tramp on macOS) and are deferred to v1.3. The
+struct sigaction layout differs per platform;
+`syscall/syscall.inc` exposes SIGACTION_SIZE / SA_HANDLER_OFF
+/ SA_FLAGS_OFF / SA_MASK_OFF (plus SA_RESTORER_OFF on Linux
+and SA_TRAMP_OFF on macOS) so callers build the struct with
+symbolic offsets.
+
 **v1.1** — sigset bit-manipulation helpers in `util/`:
 `sig_zero`, `sig_add`, `sig_del`, `sig_test`. Pure computation
 — no syscalls — using the CPU's `bts` / `btr` / `bt`
@@ -37,6 +51,7 @@ SA_RESTORER trampoline work — see "Not here yet" below.
 | ------------- | -------------------------------------------- | ------------------------------------ |
 | `sigprocmask` | `how`, `set*`, `oldset*`                     | 0 or negative errno                  |
 | `sigpending`  | `set*`                                       | 0 or negative errno                  |
+| `sigaction`   | `signum`, `act*`, `oldact*`                  | 0 or negative errno *(v1.2)*         |
 
 ### `util/` — pure-computation sigset helpers *(v1.1)*
 
@@ -194,21 +209,23 @@ $(BIN): $(OBJ) $(LIBSIG)
 
 ## Not here yet
 
-- **`sigaction`.** Installing a signal handler on Linux
-  requires the `SA_RESTORER` glibc convention — `sa_flags`
-  must include `SA_RESTORER` and `sa_restorer` must point at
-  a userspace trampoline that calls `SYS_rt_sigreturn` to
-  unwind the signal frame. Without it, the process crashes
-  when the handler returns. libsig will grow a proper
-  `sigaction` wrapper (plus the trampoline) in a later
-  version once the design is settled. macOS has no such
-  requirement, so the asymmetry only matters for the Linux
-  path — but the wrapper needs to work uniformly.
+- **Custom signal handlers via `sigaction`.** v1.2 ships
+  the syscall wrapper and supports `SIG_DFL` / `SIG_IGN`
+  dispositions — enough to say "ignore SIGPIPE" without
+  the sigprocmask block-mask dance. Installing a real
+  handler function still requires per-platform userspace
+  trampolines: `SA_RESTORER` (Linux — `sa_restorer` must
+  point at a stub calling `SYS_rt_sigreturn` to unwind the
+  signal frame) and `sa_tramp` (macOS — the kernel jumps
+  to `sa_tramp(sa_handler_ptr, ...)` on delivery and
+  expects `sa_tramp` to call `sigreturn` after the
+  handler). Both trampolines ship in v1.3.
 - **`sigsuspend`.** Blocks until a signal not in the given
   mask is delivered, then returns `-EINTR`. Small syscall,
-  but callers usually want `sigaction` first (there is no
-  point suspending for signals you have no handler for), so
-  the two ship together.
+  but callers usually want custom handlers first (there is
+  no point suspending for signals whose disposition is
+  SIG_DFL — that just terminates the process), so it ships
+  alongside the v1.3 handler support.
 - **`sigfillset`.** Trivial (a full-1s fill of the sigset
   buffer) but only meaningful once real handlers are
   installable via `sigaction` — the existing `sig_zero` +

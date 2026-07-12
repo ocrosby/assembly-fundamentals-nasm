@@ -37,11 +37,13 @@ syscall/%.o: syscall/%.asm syscall/syscall.inc
 util/%.o: util/%.asm syscall/syscall.inc
 	nasm $(NASM_FLAGS) -I .. -I syscall/ $< -o $@
 
-# Smoke-test builds the archive plus libasm.a (for panic in
-# the sig-smoke fail path) and runs the harness. Invoked via
-# bash so no exec bit is required.
+# Smoke-test builds the archive plus its co-dependencies.
+# libasm for panic in .fail. libio (v1.2+) for sig-smoke's
+# pipe wrapper in the SIG_IGN test path. Invoked via bash so
+# no exec bit is required on run.sh.
 test: $(ARCHIVE)
 	$(MAKE) -C ../asm
+	$(MAKE) -C ../io
 	bash ./test/run.sh
 
 clean:
