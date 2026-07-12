@@ -95,6 +95,9 @@
 ; v1.9 additions — memory mapping.
 %define SYS_mmap       0x20000c5
 %define SYS_munmap     0x2000049
+; v1.10 additions — scatter/gather I/O.
+%define SYS_readv      0x2000078
+%define SYS_writev     0x2000079
 %else
 %define SYS_open   2
 %define SYS_lseek  8
@@ -148,6 +151,9 @@
 ; v1.9 additions.
 %define SYS_mmap       9
 %define SYS_munmap     11
+; v1.10 additions.
+%define SYS_readv      19
+%define SYS_writev     20
 %endif
 
 ; The stat struct is 144 bytes on both macOS (`struct stat64`)
@@ -335,6 +341,15 @@
 ; error address normalized to -errno instead of the C-level
 ; (void*)-1 sentinel). Kept for callers who want a name.
 %define MAP_FAILED              -1
+
+; v1.10 — struct iovec layout. The scatter/gather primitives
+; (readv, writev) take arrays of these. Both platforms use
+; the same 16-byte layout: an 8-byte data pointer followed
+; by an 8-byte length. Callers usually build iovec arrays
+; on the stack or in .bss; there is no allocation cost.
+%define IOV_BASE_OFF            0
+%define IOV_LEN_OFF             8
+%define IOVEC_SIZE              16
 
 %macro SYSCALL_NORM 0
     syscall

@@ -138,6 +138,40 @@ tolerates a wider range (unmapping whatever intersects),
 but relying on that is a common way to accidentally free
 someone else's memory.
 
+**v1.10 — scatter/gather I/O:**
+
+| Symbol   | Arguments                             | Returns                              |
+| -------- | ------------------------------------- | ------------------------------------ |
+| `readv`  | `fd`, `iov*`, `iovcnt`                | bytes read (0 = EOF) or negative errno |
+| `writev` | `fd`, `iov*`, `iovcnt`                | bytes written or negative errno      |
+
+`readv` and `writev` are the "one syscall, many buffers"
+primitives. `writev` gathers `iovcnt` buffers into a single
+output stream on `fd`; `readv` scatters an input stream into
+`iovcnt` buffers, filling each in order until the total
+requested length is delivered or an EOF / error arrives.
+
+The `iov*` argument points at an array of `struct iovec`,
+which is 16 bytes on both platforms:
+
+- `+0`: `iov_base` (8 bytes) — pointer to the buffer
+- `+8`: `iov_len`  (8 bytes) — number of bytes at that
+  pointer
+
+`syscall.inc` exports `IOV_BASE_OFF = 0`, `IOV_LEN_OFF = 8`,
+and `IOVEC_SIZE = 16`. Callers usually build iovec arrays on
+the stack or in `.bss` — no allocation cost. `iovcnt` is
+bounded by the kernel's `IOV_MAX` (16 on Darwin, 1024 on
+Linux); over-sized calls return `-EINVAL`.
+
+The interesting property: the sender and receiver do not
+have to agree on where iovec boundaries sit. A `writev` of
+three 4-byte chunks and a `readv` of two 6-byte chunks
+against the same pipe read/write pair produces the same
+12 bytes in the receiver's split, because the kernel treats
+both sides as a byte stream — the iovec is just the
+process-side scatter/gather description, not a wire format.
+
 `fcntl` is a pass-through wrapper — its return value depends on
 the command:
 
@@ -376,6 +410,7 @@ extern fchmodat, fchownat                       ; v1.6
 extern dup, dup2, pipe                          ; v1.7
 extern fcntl, flock                             ; v1.8
 extern mmap, munmap                             ; v1.9
+extern readv, writev                            ; v1.10
 extern io_size                                  ; v1.1 util helper
 extern dir_iter_open, dir_iter_next             ; v1.4 util
 extern dir_iter_close                           ; v1.4 util
