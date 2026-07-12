@@ -31,21 +31,38 @@
 ;      SIGPIPE-only mask via the helpers, install it, read
 ;      it back, confirm the SIGPIPE bit landed — proves the
 ;      helpers produce the same wire format the kernel expects.
+;   E  sigaction(SIGPIPE, {sa_handler = SIG_IGN}, NULL) → 0.
+;      Installs SIG_IGN via the v1.2 wrapper.
+;   F  Write to a pipe with its read end closed. Now that
+;      SIGPIPE is ignored (v1.2 SIG_IGN), the syscall returns
+;      -EPIPE without terminating the process — the same
+;      "we survive" outcome 38-signal-block reached via
+;      sigprocmask, but reached via disposition instead.
+;   G  sigaction(SIGPIPE, NULL, &old) reads the disposition
+;      back — old.sa_handler must equal SIG_IGN.
+;   H  sigaction(SIGPIPE, {sa_handler = SIG_DFL}, NULL) → 0.
+;      Restores the default disposition (which for SIGPIPE
+;      would terminate the process; we never fire it again).
 
 %include "syscall.inc"
 
 %ifdef MACOS
 %define SYS_write 0x2000004
+%define SYS_read  0x2000003
+%define SYS_close 0x2000006
 %define SYS_exit  0x2000001
 %else
 %define SYS_write 1
+%define SYS_read  0
+%define SYS_close 3
 %define SYS_exit  60
 %endif
 
 default rel
 
-extern sigprocmask, sigpending
+extern sigprocmask, sigpending, sigaction
 extern sig_zero, sig_add, sig_del, sig_test
+extern pipe                         ; libio v1.7
 extern panic                        ; libasm
 
 global _start
@@ -70,6 +87,14 @@ cur_mask: resq 1                    ; oldset out slot
 pending:  resq 1
 util_buf: resq 1                    ; scratch for v1.1 util helpers
 util_msk: resq 1                    ; oldset out for sub-check D
+
+; v1.2 sigaction fixtures. .bss defaults to zero, so
+; sa_handler / sa_mask / sa_flags all start at 0. The smoke
+; only overwrites sa_handler.
+act:      resb SIGACTION_SIZE       ; new action buffer
+oldact:   resb SIGACTION_SIZE       ; oldact readback buffer
+pipefd:   resd 2                    ; libio pipe writes 2 fds here
+sig_buf:  resb 4                    ; scratch for the pipe write
 
 section .text
 
@@ -246,6 +271,106 @@ _main:
     mov rax, [cur_mask]
     test rax, 1 << (SIGPIPE - 1)
     jz .fail
+
+    ; ---- E: sigaction(SIGPIPE, {sa_handler=SIG_IGN}, NULL) → 0 ----
+    ; Build the struct in .bss which is zero-initialized —
+    ; only sa_handler needs to be set. The other fields
+    ; (sa_mask, sa_flags, sa_tramp on macOS, sa_restorer on
+    ; Linux) stay 0, which is safe for SIG_IGN since the
+    ; kernel never invokes a userspace trampoline when the
+    ; disposition is "ignore".
+    mov byte [fail_id], 'E'
+    mov qword [act + SA_HANDLER_OFF], SIG_IGN
+    mov edi, SIGPIPE
+    lea rsi, [act]
+    xor edx, edx                    ; oldact = NULL
+    call sigaction
+    test rax, rax
+    jnz .fail
+
+    ; ---- F: write to a broken pipe returns -EPIPE ----
+    ; With SIGPIPE ignored, the signal is discarded and
+    ; write returns -EPIPE instead of terminating the
+    ; process. First unblock everything so the SIG_IGN
+    ; disposition (not the sigprocmask block) is what
+    ; survives the write. The v1.2 wrapper's success on
+    ; sub-check E is worth nothing without this end-to-end
+    ; observation.
+    mov byte [fail_id], 'F'
+    mov edi, SIG_UNBLOCK
+    lea rsi, [all_set]
+    xor edx, edx
+    call sigprocmask
+    test rax, rax
+    jnz .fail
+
+    ; pipe(pipefd)
+    lea rdi, [pipefd]
+    call pipe
+    test rax, rax
+    jnz .fail
+
+    ; close(pipefd[0]) via raw syscall — libio does not
+    ; export close and pulling libsock in for one call would
+    ; churn the smoke's dep graph.
+    mov edi, [pipefd]
+    mov rax, SYS_close
+    syscall
+%ifdef MACOS
+    jnc .close_ok
+    neg rax
+.close_ok:
+%endif
+    test rax, rax
+    jnz .fail
+
+    ; write(pipefd[1], sig_buf, 1) — raw syscall for the
+    ; same reason. Expected return: -EPIPE (negative).
+    mov edi, [pipefd + 4]
+    lea rsi, [sig_buf]
+    mov edx, 1
+    mov rax, SYS_write
+    syscall
+%ifdef MACOS
+    jnc .write_ok
+    neg rax
+.write_ok:
+%endif
+    test rax, rax
+    jns .fail                       ; want strictly negative
+
+    ; ---- G: read the disposition back ----
+    ; sigaction(SIGPIPE, NULL, &old) leaves the disposition
+    ; alone and writes the current one into `old`.
+    ; old.sa_handler must equal SIG_IGN.
+    mov byte [fail_id], 'G'
+    mov edi, SIGPIPE
+    xor esi, esi                    ; act = NULL
+    lea rdx, [oldact]
+    call sigaction
+    test rax, rax
+    jnz .fail
+    cmp qword [oldact + SA_HANDLER_OFF], SIG_IGN
+    jne .fail
+
+    ; ---- H: restore SIG_DFL for hygiene ----
+    ; Reset act.sa_handler and install. We never fire
+    ; SIGPIPE again in this process, so the default
+    ; disposition (terminate) is safe.
+    mov byte [fail_id], 'H'
+    mov qword [act + SA_HANDLER_OFF], SIG_DFL
+    mov edi, SIGPIPE
+    lea rsi, [act]
+    xor edx, edx
+    call sigaction
+    test rax, rax
+    jnz .fail
+
+    ; Close the write end of the pipe so the smoke does not
+    ; leak an fd.
+    mov edi, [pipefd + 4]
+    mov rax, SYS_close
+    syscall
 
     ; PASS
     mov rax, SYS_write

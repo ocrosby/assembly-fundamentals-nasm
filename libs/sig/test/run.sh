@@ -28,10 +28,13 @@ case "$(uname -s)" in
         ;;
 esac
 
-# libsig has libasm as a co-dep for panic in .fail. The linker
-# only pulls in objects for unresolved symbols, so libasm.a is
-# effectively free on the happy path.
-libs=(../libsig.a ../../asm/libasm.a)
+# libsig has libasm as a co-dep for panic in .fail. libio joins
+# the link line in v1.2 because sig-smoke sub-checks F–H exercise
+# the SIG_IGN + write-to-broken-pipe path and need libio's pipe
+# wrapper. The linker only pulls in objects for unresolved
+# symbols, so both extra archives are effectively free on paths
+# that do not reach them.
+libs=(../libsig.a ../../asm/libasm.a ../../io/libio.a)
 
 fail_total=0
 
