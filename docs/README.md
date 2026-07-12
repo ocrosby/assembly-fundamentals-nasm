@@ -77,6 +77,11 @@ A progressive walkthrough of x86-64 assembly with NASM. Each guide is intentiona
   `getrusage`, `now_ms` / `time_diff_us` helpers, and the
   deliberate macOS asymmetry in `monotonic_ms`
   (Linux `CLOCK_MONOTONIC`, macOS `-ENOSYS`).
+- [DNS resolution](34-resolv.md) — libresolv's three
+  lookup layers (wire, transport, hostname), the RFC 1035
+  header, UDP → TCP truncation retry, and the
+  `/etc/resolv.conf` + `/etc/hosts` walk that mirrors
+  POSIX `getaddrinfo`.
 
 ## Appendix
 
