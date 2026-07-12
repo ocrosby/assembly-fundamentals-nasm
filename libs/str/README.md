@@ -1,12 +1,13 @@
 # libs/str/
 
 Byte-manipulation helpers packaged as the static archive
-`libstr.a`. Nine routines cover the raw-byte pair
-(`memcpy` / `memset` / `memcmp` / `memchr`) and the
+`libstr.a`. Eleven routines cover the raw-byte pair
+(`memcpy` / `memset` / `memcmp` / `memchr`), the
 NUL-terminated-string set (`strlen` / `strcmp` / `strncmp` /
-`strchr` / `strcpy`). Every export is pure computation — no
-syscalls, no OS-specific branches, no `%ifdef MACOS` — so the
-source has no per-platform paths and the archive builds
+`strchr` / `strcpy`), and the decimal-integer pair
+(`atoi` / `itoa`). Every export is pure computation — no
+syscalls, no OS-specific branches, no `%ifdef MACOS` — so
+the source has no per-platform paths and the archive builds
 identically on macOS and Linux.
 
 See [`../README.md`](../README.md) for the shared ABI, error
@@ -14,6 +15,15 @@ convention, and no-libc policy every archive under `libs/`
 follows.
 
 ## Version
+
+**v1.2** — decimal integer conversion: `atoi` (string → i64)
+and `itoa` (i64 → digit run). `atoi` skips leading
+whitespace and handles the optional sign, matching C's
+semantics; `itoa` writes just the digits (no trailing NUL)
+into a caller-supplied buffer, matching the "return count
+of bytes written" shape that pairs with `memcpy` and
+`send_all`. LLONG_MIN is handled correctly by treating the
+magnitude as unsigned.
 
 **v1.1** — four search / bounded-compare / copy routines
 extend the archive: `memchr`, `strchr`, `strncmp`, and
@@ -46,6 +56,8 @@ shape do not need a translation table.
 | `strncmp` | `rdi = a`, `rsi = b`, `rdx = n`              | Like `strcmp` but stops after `n` bytes or the first shared terminator.            |
 | `strchr`  | `rdi = s` (NUL-terminated), `rsi = c` (byte) | Pointer to the first byte equal to `c`, or NULL. `c = 0` matches the terminator.   |
 | `strcpy`  | `rdi = dst`, `rsi = src` (NUL-terminated)    | `rdi` (the original `dst`). Copies through and including the terminator.           |
+| `atoi`    | `rdi = s` (NUL-terminated)                   | Parsed signed 64-bit integer in `rax`. Returns 0 on "no digits" input.             |
+| `itoa`    | `rdi = n` (signed i64), `rsi = buf`          | Bytes written into `buf` in `rax`. No trailing NUL; max output is 20 bytes.        |
 
 `memcpy`, `memset`, and `strcpy` return the original `dst`
 pointer for call-chaining. `memcmp` and `strcmp` / `strncmp`
@@ -53,6 +65,10 @@ return a signed 64-bit integer in `rax` — the value always
 fits in `[-255, 255]`, so callers wanting the traditional C
 `int` can truncate the low 32 bits. `memchr` and `strchr`
 return either a pointer into the input string or NULL (0).
+`atoi` returns a full 64-bit signed integer; callers who
+want C's `int` truncate the low 32 bits. `itoa` returns the
+byte count and does not NUL-terminate — callers who need a
+C string append their own `'\0'` at `buf[rax]`.
 
 Byte-at-a-time is deliberate for the compare, scan, and
 NUL-terminated routines. A SIMD or SWAR scan can read past
@@ -124,11 +140,14 @@ in [`test/run.sh`](test/run.sh):
   (`strchr` hit / needle == '\0' / miss), O–S (`strncmp`
   equal-in-n / differ-in-n / bounded-below-diff / shorter-<-longer
   / `n = 0`), and T–U (`strcpy` copies + preserves trailing
-  sentinels / returns dst).
+  sentinels / returns dst). **v1.2** adds V–Y (`atoi` empty
+  / positive / whitespace + sign + stop-at-nondigit / above
+  INT32_MAX), Z–c (`itoa` writes "0" / "42" / "-42" / LLONG_MIN),
+  and d (round-trip `atoi ∘ itoa` for `123456789`).
 
 libasm's `panic` is on the link line because the smoke's
 `.fail` path calls into it. Sub-check IDs are single characters
-so a failure prints one of `FAIL:1` through `FAIL:U` on stderr
+so a failure prints one of `FAIL:1` through `FAIL:d` on stderr
 and the process exits 1.
 
 ## Linking against `libstr.a` from an example

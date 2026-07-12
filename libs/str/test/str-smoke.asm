@@ -36,6 +36,15 @@
 ;   S  strncmp: n = 0 returns 0
 ;   T  strcpy: copies "hello" and its terminator into a fresh buffer
 ;   U  strcpy: returns the original dst pointer
+;   V  atoi: "" returns 0
+;   W  atoi: "42" returns 42
+;   X  atoi: "  -17abc" returns -17 (skip WS, sign, stop at 'a')
+;   Y  atoi: "+2147483648" returns 2147483648 (fits in i64, not i32)
+;   Z  itoa(0, buf) writes "0" and returns 1
+;   a  itoa(42, buf) writes "42" and returns 2
+;   b  itoa(-42, buf) writes "-42" and returns 3
+;   c  itoa(-9223372036854775808, buf) writes LLONG_MIN and returns 20
+;   d  atoi ∘ itoa round-trip for 123456789
 
 %ifdef MACOS
 %define SYS_write 0x2000004
@@ -49,6 +58,7 @@ default rel
 
 extern memcpy, memset, memcmp, memchr
 extern strlen, strcmp, strncmp, strchr, strcpy
+extern atoi, itoa                   ; libstr v1.2
 extern panic                        ; libasm
 
 global _start
@@ -73,6 +83,13 @@ msg_hello3: db "hello", 0           ; distinct copy for strchr misses
 msg_abcXX:  db "abcXX", 0           ; strncmp bounded-equality target A
 msg_abcYY:  db "abcYY", 0           ; strncmp bounded-equality target B
 
+; v1.2 fixtures.
+atoi_ws_neg:  db "  -17abc", 0      ; whitespace + sign + digits + garbage
+atoi_big:     db "+2147483648", 0   ; larger than INT32_MAX, still in i64
+atoi_42:      db "42", 0
+llong_min_ref: db "-9223372036854775808"
+llong_min_ref_len: equ $ - llong_min_ref
+
 ; 12-byte reference for memcmp equality check
 ref_hi:     db "HELLO WORLD!"
 ref_hi_len: equ $ - ref_hi
@@ -94,6 +111,8 @@ dst_zero:   resb 4                  ; canary buffer for n=0 checks
 buf16:      resb 16
 buf_zero:   resb 4                  ; canary for memset n=0
 buf_cpy:    resb 8                  ; strcpy destination (v1.1)
+buf_itoa:   resb 32                 ; itoa destination (v1.2 — 20 chars + slack)
+buf_round:  resb 24                 ; itoa output for the round-trip sub-check
 
 section .text
 
@@ -418,6 +437,109 @@ _main:
     call strcpy
     lea rcx, [buf_cpy]
     cmp rax, rcx
+    jne .fail
+
+    ; ---- V: atoi("") → 0 ----
+    mov byte [fail_id], 'V'
+    lea rdi, [msg_empty]
+    call atoi
+    test rax, rax
+    jnz .fail
+
+    ; ---- W: atoi("42") → 42 ----
+    mov byte [fail_id], 'W'
+    lea rdi, [atoi_42]
+    call atoi
+    cmp rax, 42
+    jne .fail
+
+    ; ---- X: atoi("  -17abc") → -17 ----
+    ; Verifies whitespace skip, sign parse, and stop-at-nondigit.
+    mov byte [fail_id], 'X'
+    lea rdi, [atoi_ws_neg]
+    call atoi
+    cmp rax, -17
+    jne .fail
+
+    ; ---- Y: atoi("+2147483648") → 2147483648 ----
+    ; Value is INT32_MAX + 1; must not silently wrap to a
+    ; negative i32. Uses a full 64-bit compare.
+    mov byte [fail_id], 'Y'
+    lea rdi, [atoi_big]
+    call atoi
+    mov rcx, 2147483648
+    cmp rax, rcx
+    jne .fail
+
+    ; ---- Z: itoa(0, buf) → "0", returns 1 ----
+    mov byte [fail_id], 'Z'
+    xor edi, edi
+    lea rsi, [buf_itoa]
+    call itoa
+    cmp rax, 1
+    jne .fail
+    cmp byte [buf_itoa], '0'
+    jne .fail
+
+    ; ---- a: itoa(42, buf) → "42", returns 2 ----
+    mov byte [fail_id], 'a'
+    mov rdi, 42
+    lea rsi, [buf_itoa]
+    call itoa
+    cmp rax, 2
+    jne .fail
+    cmp byte [buf_itoa + 0], '4'
+    jne .fail
+    cmp byte [buf_itoa + 1], '2'
+    jne .fail
+
+    ; ---- b: itoa(-42, buf) → "-42", returns 3 ----
+    mov byte [fail_id], 'b'
+    mov rdi, -42
+    lea rsi, [buf_itoa]
+    call itoa
+    cmp rax, 3
+    jne .fail
+    cmp byte [buf_itoa + 0], '-'
+    jne .fail
+    cmp byte [buf_itoa + 1], '4'
+    jne .fail
+    cmp byte [buf_itoa + 2], '2'
+    jne .fail
+
+    ; ---- c: itoa(LLONG_MIN, buf) → "-9223372036854775808", returns 20 ----
+    ; This is the critical case that catches the "abs value
+    ; does not fit in i64" trap — the routine has to use
+    ; unsigned div on the sign-only bit pattern.
+    mov byte [fail_id], 'c'
+    mov rdi, 0x8000000000000000     ; LLONG_MIN
+    lea rsi, [buf_itoa]
+    call itoa
+    cmp rax, llong_min_ref_len      ; 20
+    jne .fail
+    lea rdi, [buf_itoa]
+    lea rsi, [llong_min_ref]
+    mov rdx, llong_min_ref_len
+    call memcmp
+    test rax, rax
+    jnz .fail
+
+    ; ---- d: atoi ∘ itoa round-trip for 123456789 ----
+    ; Sanity check that the two are inverses on a
+    ; middle-of-the-range positive input. itoa writes
+    ; digits into buf_round; append a NUL and hand it to
+    ; atoi.
+    mov byte [fail_id], 'd'
+    mov rdi, 123456789
+    lea rsi, [buf_round]
+    call itoa
+    ; rax = bytes written. Append NUL so atoi's stop
+    ; condition matches.
+    lea r9, [buf_round]
+    mov byte [r9 + rax], 0
+    lea rdi, [buf_round]
+    call atoi
+    cmp rax, 123456789
     jne .fail
 
     ; PASS
