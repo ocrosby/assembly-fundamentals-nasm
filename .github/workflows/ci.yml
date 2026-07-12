@@ -103,6 +103,7 @@ jobs:
             [38-signal-block]=42
             [39-number-store]=42
             [40-fork-signal]=42
+            [41-logger]=42
           )
           # Examples that read from stdin get an empty pipe so they hit
           # EOF immediately and exit 0 without waiting for a TTY.
