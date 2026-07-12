@@ -1,4 +1,4 @@
-NAME    := flock-mutex
+NAME    := flock
 SRC     := $(NAME).asm
 OBJ     := $(NAME).o
 BIN     := $(NAME)

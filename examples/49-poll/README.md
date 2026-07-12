@@ -1,4 +1,4 @@
-# 49 — poll-pipe
+# 49 — poll
 
 Multiplex on a single pipe with `poll(2)`. Poll first with an
 empty pipe — it times out after 50 ms and returns 0. Write one
