@@ -81,6 +81,7 @@ cleanup() {
           fcntl-smoke fcntl-smoke.o \
           file-copy-smoke file-copy-smoke.o \
           file-read-all-smoke file-read-all-smoke.o \
+          file-write-all-smoke file-write-all-smoke.o \
           c-smoke /tmp/libio-c-smoke.tmp /tmp/libio-c-smoke.tmp2 \
                   /tmp/libio-c-smoke.link
     rm -rf "$dirpath" "$iter_dir" "$at_dir" \
@@ -284,6 +285,34 @@ if [ "$fra_code" -eq 0 ]; then
     printf "PASS: %-12s output=[%s]\n" "file-read-all-smoke" "$fra_out"
 else
     printf "FAIL: %-12s exit=%d output=[%s]\n" "file-read-all-smoke" "$fra_code" "$fra_out"
+    fail_total=$((fail_total + 1))
+fi
+
+# ---------------------------------------------------------------
+# file-write-all-smoke — v1.13 file_write_all composed helper.
+# Needs a destination path and an empty-destination path; both
+# are cleaned up post-run.
+# ---------------------------------------------------------------
+fwa_dst="$(mktemp -u /tmp/libio-file-write-all-smoke.dst.XXXXXX)"
+fwa_empty="$(mktemp -u /tmp/libio-file-write-all-smoke.empty.XXXXXX)"
+
+# shellcheck disable=SC2086
+nasm $nasm_fmt -I ../.. -I../syscall/ \
+    -DDST_PATH="\"$fwa_dst\"" \
+    -DEMPTY_DST_PATH="\"$fwa_empty\"" \
+    file-write-all-smoke.asm -o file-write-all-smoke.o
+"${ld_cmd[@]}" file-write-all-smoke.o "${libs[@]}" -o file-write-all-smoke
+
+set +e
+fwa_out="$(./file-write-all-smoke 2>&1)"
+fwa_code=$?
+set -e
+rm -f "$fwa_dst" "$fwa_empty"
+
+if [ "$fwa_code" -eq 0 ]; then
+    printf "PASS: %-12s output=[%s]\n" "file-write-all-smoke" "$fwa_out"
+else
+    printf "FAIL: %-12s exit=%d output=[%s]\n" "file-write-all-smoke" "$fwa_code" "$fwa_out"
     fail_total=$((fail_total + 1))
 fi
 
