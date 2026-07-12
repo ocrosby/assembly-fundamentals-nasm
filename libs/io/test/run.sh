@@ -35,8 +35,12 @@ case "$(uname -s)" in
 esac
 
 # io-smoke and fail-smoke are standalone binaries; c-smoke uses cc.
-# They all need libio.a. io-smoke also needs a runtime tmpfile.
-libs=(../libio.a)
+# They all need libio.a. libasm.a is on the line for the sub-set of
+# smokes that call into libasm's `panic` (v1.1) via their `.fail`
+# path — inert for the ones that still hand-roll the write+exit
+# sequence, since the linker only pulls in objects referenced by an
+# unresolved symbol. io-smoke also needs a runtime tmpfile.
+libs=(../libio.a ../../asm/libasm.a)
 
 tmpfile="$(mktemp /tmp/libio-smoke.XXXXXX)"
 # Reserve a distinct scratch DIR path — mktemp -d would create it,
