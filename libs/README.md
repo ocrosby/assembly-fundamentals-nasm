@@ -34,6 +34,7 @@ All archives in this directory share the same conventions:
 | [`str/`](str/)    | `libstr.a`  | Byte-manipulation helpers (`memcpy`, `memset`, `memcmp`, `memchr`, `strlen`, `strcmp`, `strncmp`, `strchr`, `strcpy`) plus decimal integer conversion (`atoi`, `itoa`). Pure computation — no syscalls, no per-platform paths. |
 | [`sig/`](sig/)    | `libsig.a`  | POSIX signal primitives — `sigprocmask`, `sigpending`, and `sigaction`. SIG_DFL/SIG_IGN on both platforms; custom handlers on Linux via v1.3's `sig_restorer` SA_RESTORER trampoline. macOS custom handlers deferred pending sa_tramp / SYS_sigreturn-token work. Per-platform SIG_* and struct sigaction offsets normalized in `syscall.inc`. |
 | [`buf/`](buf/)    | `libbuf.a`  | Mmap-backed growable byte buffer — `buf_init`, `buf_reserve`, `buf_append`, `buf_reset`, `buf_free` around a 24-byte caller-owned `struct buf`. Grow strategy is `max(cap*2, needed)` rounded to `BUF_PAGE_SIZE`; a grow relocates the mapping (`mmap`-copy-`munmap`, no `mremap`), so pointers into `data` must be reread after any call that can grow. Composes `libio`'s `mmap` / `munmap`; owns no raw syscalls. |
+| [`http/`](http/)  | `libhttp.a` | HTTP/1.1 wire-format primitives (RFC 9110 + RFC 9112). v1.0 ships `http_parse_request_line` — parses `method SP target SP HTTP/1.x CRLF` into a 40-byte caller-owned view struct. Returns bytes consumed on success, `-HTTP_EAGAIN` on partial input, `-HTTP_EINVAL` on a malformed line. Header block parser, chunked decoder, and response emitter follow. Composes `libstr`; owns no raw syscalls. |
 
 Each subdirectory's `README.md` documents the exported symbols and
 calling conventions for that archive.
@@ -52,6 +53,7 @@ make -C libs/proc
 make -C libs/str
 make -C libs/sig
 make -C libs/buf
+make -C libs/http
 ```
 
 There is no aggregate `libs/Makefile` yet — each archive has its own

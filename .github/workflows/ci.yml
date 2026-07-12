@@ -178,3 +178,7 @@ jobs:
       - name: Build and smoke-test the buffer library
         shell: bash
         run: make -C libs/buf test
+
+      - name: Build and smoke-test the HTTP library
+        shell: bash
+        run: make -C libs/http test
