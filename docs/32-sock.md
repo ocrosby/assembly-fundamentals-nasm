@@ -117,6 +117,9 @@ same port without hard-coding one.
   smallest `poll` demo: one pipe, one `struct pollfd`,
   the timeout path and the `POLLIN` ready path in one
   program.
+- [`35-multiplexing.md`](35-multiplexing.md) — the full
+  `poll` treatment: struct layout, timeout semantics,
+  events, and where `epoll` / `kqueue` take over.
 
 ## Next
 
