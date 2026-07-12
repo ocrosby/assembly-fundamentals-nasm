@@ -13,6 +13,14 @@ follows.
 
 ## Version
 
+**v1.1** — sigset bit-manipulation helpers in `util/`:
+`sig_zero`, `sig_add`, `sig_del`, `sig_test`. Pure computation
+— no syscalls — using the CPU's `bts` / `btr` / `bt`
+instructions which take a bit index into a memory bitmap and
+compute the byte-and-bit split automatically. Callers no
+longer have to write `1 << (SIGPIPE - 1)` inline; they build
+sets by name.
+
 **v1.0** — scaffolding release: `sigprocmask` and
 `sigpending`. Both are direct syscall wrappers with
 platform-normalized error returns and internal handling of
@@ -23,10 +31,28 @@ SA_RESTORER trampoline work — see "Not here yet" below.
 
 ## Exported symbols
 
+### `syscall/` — direct kernel wrappers
+
 | Symbol        | Arguments                                    | Returns                              |
 | ------------- | -------------------------------------------- | ------------------------------------ |
 | `sigprocmask` | `how`, `set*`, `oldset*`                     | 0 or negative errno                  |
 | `sigpending`  | `set*`                                       | 0 or negative errno                  |
+
+### `util/` — pure-computation sigset helpers *(v1.1)*
+
+| Symbol      | Arguments               | Returns                                                             |
+| ----------- | ----------------------- | ------------------------------------------------------------------- |
+| `sig_zero`  | `set*`                  | void. Clears every byte of the SIGSET_BYTES-sized buffer.           |
+| `sig_add`   | `set*`, `sig`           | void. Sets bit `(sig - 1)`.                                         |
+| `sig_del`   | `set*`, `sig`           | void. Clears bit `(sig - 1)`.                                       |
+| `sig_test`  | `set*`, `sig`           | `1` if bit `(sig - 1)` is set, `0` otherwise.                       |
+
+The bit-manipulation helpers use x86-64 `bts` / `btr` / `bt`
+with a 64-bit register bit index, so the CPU computes the
+byte-and-bit split automatically — no manual divide-and-mod
+in the wrapper. Undefined behavior for `sig` outside the
+range 1..64 (Linux) or 1..32 (macOS) — matching the C
+`sigaddset` contract at optimized settings.
 
 `sigprocmask` changes the calling thread's signal mask. `how`
 is one of `SIG_BLOCK` (add the signals in `set` to the mask),
@@ -183,12 +209,12 @@ $(BIN): $(OBJ) $(LIBSIG)
   but callers usually want `sigaction` first (there is no
   point suspending for signals you have no handler for), so
   the two ship together.
-- **`sigemptyset / sigfillset / sigaddset / sigdelset /
-  sigismember`.** Pure-computation helpers for building
-  `sigset_t` values. These will land in `util/` alongside
-  `sigaction` — for v1.0 callers write the bit pattern
-  directly (`1 << (SIGPIPE - 1)`), which is fine for the
-  usual small-set use case.
+- **`sigfillset`.** Trivial (a full-1s fill of the sigset
+  buffer) but only meaningful once real handlers are
+  installable via `sigaction` — the existing `sig_zero` +
+  `sig_add` composition covers building any subset of
+  signals, which is what callers actually need before
+  `sigaction` lands.
 
 ## See also
 

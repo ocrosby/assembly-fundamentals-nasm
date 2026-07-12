@@ -20,6 +20,17 @@
 ;   6  sigprocmask with an obviously bogus how value returns
 ;      negative errno — proves error normalization on the
 ;      macOS SYSCALL_NORM path fires end to end.
+;   7  sig_zero(buf) on a pre-dirtied buffer clears every
+;      SIGSET_BYTES byte to 0.
+;   8  sig_add(buf, SIGPIPE) sets exactly bit 12 (SIGPIPE - 1).
+;   9  sig_test(buf, SIGPIPE) returns 1.
+;   A  sig_test(buf, SIGINT) returns 0 (never added).
+;   B  sig_del(buf, SIGPIPE) clears bit 12.
+;   C  sig_test(buf, SIGPIPE) returns 0 after sig_del.
+;   D  sig_zero + sig_add + sigprocmask round-trip: build a
+;      SIGPIPE-only mask via the helpers, install it, read
+;      it back, confirm the SIGPIPE bit landed — proves the
+;      helpers produce the same wire format the kernel expects.
 
 %include "syscall.inc"
 
@@ -34,6 +45,7 @@
 default rel
 
 extern sigprocmask, sigpending
+extern sig_zero, sig_add, sig_del, sig_test
 extern panic                        ; libasm
 
 global _start
@@ -56,6 +68,8 @@ set_pipe: resq 1                    ; will hold bit for SIGPIPE
 all_set:  resq 1                    ; 0xFFFFFFFFFFFFFFFF
 cur_mask: resq 1                    ; oldset out slot
 pending:  resq 1
+util_buf: resq 1                    ; scratch for v1.1 util helpers
+util_msk: resq 1                    ; oldset out for sub-check D
 
 section .text
 
@@ -132,6 +146,106 @@ _main:
     call sigprocmask
     test rax, rax
     jns .fail                       ; want strictly negative
+
+    ; ---- 7: sig_zero on a dirty buffer clears every byte ----
+    ; Prime util_buf with a distinctive pattern so leftover
+    ; bytes fail the check. Only the SIGSET_BYTES-sized head
+    ; is primed and inspected — that is the region sig_zero
+    ; is contracted to clear (4 bytes on macOS, 8 on Linux;
+    ; see syscall.inc).
+    mov byte [fail_id], '7'
+%ifdef MACOS
+    mov dword [util_buf], -1
+%else
+    mov qword [util_buf], -1
+%endif
+    lea rdi, [util_buf]
+    call sig_zero
+%ifdef MACOS
+    cmp dword [util_buf], 0
+%else
+    cmp qword [util_buf], 0
+%endif
+    jne .fail
+
+    ; ---- 8: sig_add(buf, SIGPIPE) sets exactly bit 12 ----
+    ; util_buf was zeroed in sub-check 7. After adding SIGPIPE
+    ; the sigset should read 1 << 12 = 0x1000 in the low
+    ; SIGSET_BYTES bytes.
+    mov byte [fail_id], '8'
+    lea rdi, [util_buf]
+    mov esi, SIGPIPE
+    call sig_add
+%ifdef MACOS
+    mov eax, [util_buf]
+    cmp eax, 1 << (SIGPIPE - 1)
+%else
+    mov rax, [util_buf]
+    cmp rax, 1 << (SIGPIPE - 1)
+%endif
+    jne .fail
+
+    ; ---- 9: sig_test(buf, SIGPIPE) → 1 ----
+    mov byte [fail_id], '9'
+    lea rdi, [util_buf]
+    mov esi, SIGPIPE
+    call sig_test
+    cmp rax, 1
+    jne .fail
+
+    ; ---- A: sig_test(buf, SIGINT) → 0 (never added) ----
+    mov byte [fail_id], 'A'
+    lea rdi, [util_buf]
+    mov esi, SIGINT
+    call sig_test
+    test rax, rax
+    jnz .fail
+
+    ; ---- B: sig_del(buf, SIGPIPE) clears bit 12 ----
+    mov byte [fail_id], 'B'
+    lea rdi, [util_buf]
+    mov esi, SIGPIPE
+    call sig_del
+%ifdef MACOS
+    cmp dword [util_buf], 0
+%else
+    cmp qword [util_buf], 0
+%endif
+    jne .fail
+
+    ; ---- C: sig_test(buf, SIGPIPE) → 0 after sig_del ----
+    mov byte [fail_id], 'C'
+    lea rdi, [util_buf]
+    mov esi, SIGPIPE
+    call sig_test
+    test rax, rax
+    jnz .fail
+
+    ; ---- D: helper-built mask survives the sigprocmask ----
+    ; round-trip: zero, add SIGPIPE, install via SIG_SETMASK,
+    ; read back, confirm SIGPIPE lands. Proves the helpers
+    ; emit the same wire format the kernel expects.
+    mov byte [fail_id], 'D'
+    lea rdi, [util_buf]
+    call sig_zero
+    lea rdi, [util_buf]
+    mov esi, SIGPIPE
+    call sig_add
+    mov edi, SIG_SETMASK
+    lea rsi, [util_buf]
+    lea rdx, [util_msk]              ; oldset — we do not check it
+    call sigprocmask
+    test rax, rax
+    jnz .fail
+    xor edi, edi
+    xor esi, esi
+    lea rdx, [cur_mask]
+    call sigprocmask
+    test rax, rax
+    jnz .fail
+    mov rax, [cur_mask]
+    test rax, 1 << (SIGPIPE - 1)
+    jz .fail
 
     ; PASS
     mov rax, SYS_write

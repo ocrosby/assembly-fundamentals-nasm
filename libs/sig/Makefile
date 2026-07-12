@@ -2,10 +2,11 @@ NAME    := sig
 ARCHIVE := lib$(NAME).a
 
 # syscall/ holds direct kernel wrappers plus their shared
-# syscall.inc header. util/ will land here in v1.1+ once the
-# archive grows composed helpers.
+# syscall.inc header. util/ (v1.1+) holds pure-computation
+# helpers — sigset bit manipulation for now.
 SYSCALL_SRCS := $(wildcard syscall/*.asm)
-SRCS         := $(SYSCALL_SRCS)
+UTIL_SRCS    := $(wildcard util/*.asm)
+SRCS         := $(SYSCALL_SRCS) $(UTIL_SRCS)
 OBJS         := $(SRCS:.asm=.o)
 
 UNAME_S := $(shell uname -s)
@@ -29,6 +30,11 @@ $(ARCHIVE): $(OBJS)
 # The dependency on syscall.inc forces every wrapper to rebuild
 # when the shared header changes.
 syscall/%.o: syscall/%.asm syscall/syscall.inc
+	nasm $(NASM_FLAGS) -I .. -I syscall/ $< -o $@
+
+# util/ objects use syscall.inc for SIGSET_BYTES, so they
+# share the same -I flag and dependency.
+util/%.o: util/%.asm syscall/syscall.inc
 	nasm $(NASM_FLAGS) -I .. -I syscall/ $< -o $@
 
 # Smoke-test builds the archive plus libasm.a (for panic in
