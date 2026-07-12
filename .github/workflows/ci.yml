@@ -111,6 +111,7 @@ jobs:
             [46-nonblock]=42
             [47-timing]=42
             [48-flock]=42
+            [49-poll]=42
           )
           # Examples that read from stdin get an empty pipe so they hit
           # EOF immediately and exit 0 without waiting for a TTY.
