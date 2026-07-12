@@ -32,7 +32,7 @@ All archives in this directory share the same conventions:
 | [`time/`](time/)  | `libtime.a` | Wall-clock and CPU-time primitives from `<sys/time.h>` / `<sys/resource.h>` — `gettimeofday`, `sleep_ms`, `getrusage`, plus `time_diff_us`, `now_ms`, and `monotonic_ms` util helpers. `monotonic_ms` is deliberately asymmetric: Linux uses `clock_gettime(CLOCK_MONOTONIC, ...)`, macOS returns `-ENOSYS`. |
 | [`proc/`](proc/)  | `libproc.a` | Process control from `<unistd.h>` / `<sys/wait.h>` / `<signal.h>` — `fork`, `execve`, `wait4`, `getpid`, `getppid`, `kill`, plus a `spawn_wait` composed helper. |
 | [`str/`](str/)    | `libstr.a`  | Byte-manipulation helpers (`memcpy`, `memset`, `memcmp`, `memchr`, `strlen`, `strcmp`, `strncmp`, `strchr`, `strcpy`) plus decimal integer conversion (`atoi`, `itoa`). Pure computation — no syscalls, no per-platform paths. |
-| [`sig/`](sig/)    | `libsig.a`  | POSIX signal primitives — `sigprocmask`, `sigpending`, and `sigaction` (SIG_DFL/SIG_IGN dispositions in v1.2; custom handler trampolines deferred to v1.3). Per-platform SIG_* and struct sigaction offsets normalized in `syscall.inc`. |
+| [`sig/`](sig/)    | `libsig.a`  | POSIX signal primitives — `sigprocmask`, `sigpending`, and `sigaction`. SIG_DFL/SIG_IGN on both platforms; custom handlers on Linux via v1.3's `sig_restorer` SA_RESTORER trampoline. macOS custom handlers deferred pending sa_tramp / SYS_sigreturn-token work. Per-platform SIG_* and struct sigaction offsets normalized in `syscall.inc`. |
 
 Each subdirectory's `README.md` documents the exported symbols and
 calling conventions for that archive.

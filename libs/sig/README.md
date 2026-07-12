@@ -13,19 +13,29 @@ follows.
 
 ## Version
 
+**v1.3** — custom-handler support on **Linux**. Ships
+`sig_restorer`, the SA_RESTORER trampoline that invokes
+`SYS_rt_sigreturn` when a handler returns; without it, the
+handler's `ret` pops garbage from the signal frame and the
+process crashes. Callers who install a real handler set
+`sa_flags |= SA_RESTORER` and `sa_restorer = sig_restorer`.
+macOS's equivalent (a userspace `sa_tramp` that calls
+Darwin's `SYS_sigreturn(uctx, sigstyle, token)`) requires
+reading a per-delivery token out of the signal frame the
+kernel constructs; that piece is deferred to a future
+version pending xnu-internal research. On macOS, callers
+keep v1.2's SIG_DFL / SIG_IGN support.
+
 **v1.2** — `sigaction` wrapper for the SIG_IGN / SIG_DFL
 dispositions. Callers can now say "ignore SIGPIPE" without
 the sigprocmask block-mask dance
 ([`38-signal-block`](../../examples/38-signal-block/) uses
 the older pattern; consumers who prefer disposition-style
-now reach for `sigaction`). Real handler functions still
-require a per-platform userspace trampoline (SA_RESTORER on
-Linux, sa_tramp on macOS) and are deferred to v1.3. The
-struct sigaction layout differs per platform;
-`syscall/syscall.inc` exposes SIGACTION_SIZE / SA_HANDLER_OFF
-/ SA_FLAGS_OFF / SA_MASK_OFF (plus SA_RESTORER_OFF on Linux
-and SA_TRAMP_OFF on macOS) so callers build the struct with
-symbolic offsets.
+reach for `sigaction`). The struct sigaction layout differs
+per platform; `syscall/syscall.inc` exposes SIGACTION_SIZE /
+SA_HANDLER_OFF / SA_FLAGS_OFF / SA_MASK_OFF (plus
+SA_RESTORER_OFF on Linux and SA_TRAMP_OFF on macOS) so
+callers build the struct with symbolic offsets.
 
 **v1.1** — sigset bit-manipulation helpers in `util/`:
 `sig_zero`, `sig_add`, `sig_del`, `sig_test`. Pure computation
@@ -61,6 +71,7 @@ SA_RESTORER trampoline work — see "Not here yet" below.
 | `sig_add`   | `set*`, `sig`           | void. Sets bit `(sig - 1)`.                                         |
 | `sig_del`   | `set*`, `sig`           | void. Clears bit `(sig - 1)`.                                       |
 | `sig_test`  | `set*`, `sig`           | `1` if bit `(sig - 1)` is set, `0` otherwise.                       |
+| `sig_restorer` *(Linux only, v1.3)* | (kernel-called) | SA_RESTORER trampoline. Callers store its address in `sa_restorer` and OR `SA_RESTORER` into `sa_flags` so the kernel invokes it when a handler returns; the trampoline then calls `SYS_rt_sigreturn` to unwind the signal frame. Never called directly. |
 
 The bit-manipulation helpers use x86-64 `bts` / `btr` / `bt`
 with a 64-bit register bit index, so the CPU computes the
@@ -161,18 +172,23 @@ make -C libs/sig test
 The test target builds the archive first, then runs the
 harness in [`test/run.sh`](test/run.sh):
 
-- **`sig-smoke`** — sub-check 1 installs a mask containing
-  only SIGPIPE; sub-check 2 reads the mask back and confirms
-  the SIGPIPE bit is set; sub-check 3 unblocks every signal
-  via `SIG_UNBLOCK` with a full-1s set; sub-check 4 confirms
-  the SIGPIPE bit is clear; sub-check 5 exercises
-  `sigpending` (return-only, since pending state is
-  process-dependent); sub-check 6 passes a bogus `how`
-  argument and confirms the wrapper propagates a negative
-  errno (proves the macOS SYSCALL_NORM path fires).
+- **`sig-smoke`** — sub-checks 1–6 cover the v1.0 syscall
+  wrappers (`sigprocmask` block/read/unblock, `sigpending`
+  return, bogus-`how` error normalization); 7–D cover the
+  v1.1 sigset helpers (`sig_zero` / `sig_add` / `sig_del`
+  / `sig_test` plus a helper-built-mask round-trip through
+  `sigprocmask`); E–H cover v1.2's sigaction with
+  `SIG_IGN` (install, verify via write-to-broken-pipe,
+  read back through `oldact`, restore `SIG_DFL`); I–L
+  **(Linux only)** cover v1.3's custom handler path
+  (install real handler + `SA_RESTORER` + `sig_restorer`,
+  trigger via broken pipe, observe the handler ran, restore
+  `SIG_DFL`). On macOS I–L are skipped via `%ifndef MACOS`
+  until sa_tramp support lands.
 
 libasm's `panic` is on the link line because the smoke's
-`.fail` path calls into it.
+`.fail` path calls into it. libio joins the link line for
+the smoke's `pipe` fixture in E–H (and I–L on Linux).
 
 ## Linking against `libsig.a` from a consumer
 
@@ -209,17 +225,16 @@ $(BIN): $(OBJ) $(LIBSIG)
 
 ## Not here yet
 
-- **Custom signal handlers via `sigaction`.** v1.2 ships
-  the syscall wrapper and supports `SIG_DFL` / `SIG_IGN`
-  dispositions — enough to say "ignore SIGPIPE" without
-  the sigprocmask block-mask dance. Installing a real
-  handler function still requires per-platform userspace
-  trampolines: `SA_RESTORER` (Linux — `sa_restorer` must
-  point at a stub calling `SYS_rt_sigreturn` to unwind the
-  signal frame) and `sa_tramp` (macOS — the kernel jumps
-  to `sa_tramp(sa_handler_ptr, ...)` on delivery and
-  expects `sa_tramp` to call `sigreturn` after the
-  handler). Both trampolines ship in v1.3.
+- **Custom signal handlers on macOS.** v1.3 ships
+  `sig_restorer` (Linux SA_RESTORER trampoline), so Linux
+  callers can install real handler functions. macOS's
+  equivalent trampoline (`sa_tramp`) needs to invoke
+  Darwin's `SYS_sigreturn(uctx, sigstyle, token)`, where
+  `token` is a per-delivery value the kernel stores in the
+  signal frame at a layout-dependent offset. Reading that
+  offset out of the xnu source is on the road map but not
+  in this release. Until it lands, macOS callers stick
+  with v1.2's SIG_DFL / SIG_IGN dispositions.
 - **`sigsuspend`.** Blocks until a signal not in the given
   mask is delivered, then returns `-EINTR`. Small syscall,
   but callers usually want custom handlers first (there is
