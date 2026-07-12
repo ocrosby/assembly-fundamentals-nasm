@@ -82,6 +82,7 @@ cleanup() {
           file-copy-smoke file-copy-smoke.o \
           file-read-all-smoke file-read-all-smoke.o \
           file-write-all-smoke file-write-all-smoke.o \
+          file-append-smoke file-append-smoke.o \
           c-smoke /tmp/libio-c-smoke.tmp /tmp/libio-c-smoke.tmp2 \
                   /tmp/libio-c-smoke.link
     rm -rf "$dirpath" "$iter_dir" "$at_dir" \
@@ -313,6 +314,34 @@ if [ "$fwa_code" -eq 0 ]; then
     printf "PASS: %-12s output=[%s]\n" "file-write-all-smoke" "$fwa_out"
 else
     printf "FAIL: %-12s exit=%d output=[%s]\n" "file-write-all-smoke" "$fwa_code" "$fwa_out"
+    fail_total=$((fail_total + 1))
+fi
+
+# ---------------------------------------------------------------
+# file-append-smoke — v1.14 file_append composed helper. Needs
+# a fresh-file destination and an empty-file destination; both
+# are cleaned up post-run.
+# ---------------------------------------------------------------
+fap_dst="$(mktemp -u /tmp/libio-file-append-smoke.dst.XXXXXX)"
+fap_empty="$(mktemp -u /tmp/libio-file-append-smoke.empty.XXXXXX)"
+
+# shellcheck disable=SC2086
+nasm $nasm_fmt -I ../.. -I../syscall/ \
+    -DDST_PATH="\"$fap_dst\"" \
+    -DEMPTY_PATH="\"$fap_empty\"" \
+    file-append-smoke.asm -o file-append-smoke.o
+"${ld_cmd[@]}" file-append-smoke.o "${libs[@]}" -o file-append-smoke
+
+set +e
+fap_out="$(./file-append-smoke 2>&1)"
+fap_code=$?
+set -e
+rm -f "$fap_dst" "$fap_empty"
+
+if [ "$fap_code" -eq 0 ]; then
+    printf "PASS: %-12s output=[%s]\n" "file-append-smoke" "$fap_out"
+else
+    printf "FAIL: %-12s exit=%d output=[%s]\n" "file-append-smoke" "$fap_code" "$fap_out"
     fail_total=$((fail_total + 1))
 fi
 
