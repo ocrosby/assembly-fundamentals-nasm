@@ -58,6 +58,10 @@ A progressive walkthrough of x86-64 assembly with NASM. Each guide is intentiona
   model: `fork` returning twice, `execve` replacing the
   image, `wait4` status-word interpretation, and the
   `spawn_wait` composed helper.
+- [File I/O](30-io.md) — libio's file family (`file_read_all`
+  / `file_write_all` / `file_append` / `file_copy`), the
+  O_TRUNC vs O_APPEND distinction, short-write handling, and
+  the ownership contract for the mmap `file_read_all` returns.
 
 ## Appendix
 
