@@ -560,6 +560,16 @@ sit on top of one or more syscall wrappers. Currently:
   `+21`, Linux `+19`) offsets behind an
   `open`/`next`/`close` triple whose state lives in a
   caller-allocated opaque block.
+- [`file_append`](util/file-append.asm) *(v1.14)* —
+  `file_append(path, addr, size)` tacks `size` bytes onto
+  the end of the file at `path` (creating the file if
+  missing), matching the O_APPEND semantics used for log
+  files: every write on this fd atomically seeks to the
+  end before writing, so multiple concurrent appenders see
+  interleaved but whole records rather than stepped-on
+  ones. Mirror of `file_write_all` — the difference is the
+  flag mask (O_APPEND swaps in for O_TRUNC). `size = 0`
+  still opens (creating the file if missing) and closes.
 - [`file_write_all`](util/file-write-all.asm) *(v1.13)* —
   `file_write_all(path, addr, size)` dumps a caller-owned
   buffer into a fresh file at `path`, creating or truncating
