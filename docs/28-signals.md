@@ -7,9 +7,7 @@ a bad memory access. Every process has three levers for each
 signal: the mask (block delivery), the pending set (which
 blocked signals have queued up), and the disposition
 (default, ignore, or a handler function). This repo's
-[`libsig`](../libs/sig/) covers the first two; the third —
-handler installation via `sigaction` — is deferred for
-reasons explained below.
+[`libsig`](../libs/sig/) covers all three.
 
 ## Sigset layout
 
@@ -56,23 +54,46 @@ walks the full pattern end to end: block SIGPIPE, write to
 a broken pipe, verify via `sigpending` + `sig_test` that the
 signal was queued, exit before unblocking.
 
-## Why `sigaction` is not here yet
+## Handler installation via `sigaction`
 
-Installing a signal handler on Linux requires the
-`SA_RESTORER` glibc convention. `sa_flags` must include
-`SA_RESTORER` and `sa_restorer` must point at a userspace
-trampoline that calls `SYS_rt_sigreturn` to unwind the
-signal frame. Without it, the process crashes when the
-handler returns. macOS has no such requirement — its kernel
-finds the return trampoline on its own — but the wrapper
-needs to work uniformly. libsig will grow a proper
-`sigaction` wrapper (plus the trampoline) in a later
-version once the design is settled.
+`sigaction(signum, act, oldact)` installs a disposition for
+one signal. `act` points at a `struct sigaction` whose
+per-platform layout libsig exposes as `SA_HANDLER_OFF`,
+`SA_MASK_OFF`, `SA_FLAGS_OFF`, and `SIGACTION_SIZE` (24 on
+macOS, 32 on Linux). Callers reserve the struct with
+`resb SIGACTION_SIZE` and write field-by-field via the
+offsets — no host-side struct definition, no packed layout
+assumption.
 
-Until then, callers who need "ignore this signal" reach for
-the block-mask pattern via `sigprocmask` (per-signal, thread
-local, no trampoline required) or the per-call
-`MSG_NOSIGNAL` / `SO_NOSIGPIPE` socket flags.
+The subtle part is what happens when the handler returns.
+The kernel stacks a signal frame on entry; that frame has
+to be unwound before the interrupted instruction can
+resume. The two platforms disagree on who supplies the
+unwinder:
+
+- **Linux** requires the caller to set `SA_RESTORER` in
+  `sa_flags` and point `sa_restorer` at a userspace
+  trampoline that invokes `SYS_rt_sigreturn`. libsig ships
+  one at [`sig_restorer`](../libs/sig/util/sig-restorer.asm)
+  — a three-instruction stub whose only job is to make that
+  syscall. Omit it and the process crashes on handler
+  return.
+- **macOS** injects the trampoline itself. libsig ships an
+  `sa_tramp` for callers that want to install a handler
+  through the same code path as Linux; the kernel calls it
+  with the standard `(handler, style, sig, info, uctx)`
+  signature.
+
+The [`42-signal-handler`](../examples/42-signal-handler/)
+example walks the full install — build the struct, wire in
+`sig_restorer` on Linux, catch SIGPIPE — and asserts that a
+write to a broken pipe reaches the handler instead of
+killing the process.
+
+For "just ignore this signal" without a handler, the
+block-mask pattern via `sigprocmask` (per-signal, thread
+local, no trampoline) or the per-call `MSG_NOSIGNAL` /
+`SO_NOSIGPIPE` socket flags remain the smaller tools.
 
 ## See also
 
@@ -81,7 +102,10 @@ local, no trampoline required) or the per-call
 - [`27-libraries.md`](27-libraries.md) — the archive index
   this chapter is a companion to.
 - [`examples/38-signal-block/`](../examples/38-signal-block/)
-  — the runnable that exercises everything above.
+  — the runnable that exercises the mask + pending story.
+- [`examples/42-signal-handler/`](../examples/42-signal-handler/)
+  — the runnable that installs a SIGPIPE handler through
+  `sigaction`, using `sig_restorer` on Linux.
 
 ## Next
 
