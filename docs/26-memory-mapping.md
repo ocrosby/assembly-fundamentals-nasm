@@ -129,6 +129,15 @@ call munmap
 Pass the exact `addr` and `len` that `mmap` returned; storing both in
 a caller-side struct is cheaper than trying to recover them later.
 
+## See also
+
+- [`39-growable-buffer.md`](39-growable-buffer.md) — libbuf,
+  the mmap-backed byte vector one level up from this
+  chapter's raw primitive: `struct buf` bookkeeping, the
+  `max(cap*2, needed)` grow strategy, and the pointer
+  relocation that falls out of `mmap` + `memcpy` +
+  `munmap` on both platforms.
+
 ## Next
 
 - Back to [docs/README.md](README.md).

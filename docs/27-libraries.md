@@ -8,7 +8,7 @@ small helper built on top of one, and none of them link libc.
 
 ## What is in `libs/`
 
-Eight archives cover the routines this material builds on:
+Nine archives cover the routines this material builds on:
 
 | Archive       | Purpose                                                                          |
 | ------------- | -------------------------------------------------------------------------------- |
@@ -20,6 +20,7 @@ Eight archives cover the routines this material builds on:
 | `libproc.a`   | Process control (`fork`, `execve`, `wait4`, `kill`) plus the `spawn_wait` helper. |
 | `libstr.a`    | Byte-manipulation helpers (`memcpy`, `memcmp`, `strlen`, `strchr`, `strcpy`, …). |
 | `libsig.a`    | POSIX signal-mask primitives (`sigprocmask`, `sigpending`) plus sigset helpers.  |
+| `libbuf.a`    | Mmap-backed growable byte buffer — `buf_init`, `buf_reserve`, `buf_append`, `buf_reset`, `buf_free` around a 24-byte `struct buf`. See [39-growable-buffer.md](39-growable-buffer.md). |
 
 Each archive has its own `README.md` with the full symbol table and
 per-platform notes.
