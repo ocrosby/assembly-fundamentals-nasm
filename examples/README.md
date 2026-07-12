@@ -44,6 +44,7 @@ vocabulary needed for the early chapters of [../docs/](../docs/).
 | 33 | [33-spawn-child](33-spawn-child/)                    | `spawn_wait` — first libproc `util/` helper; folds fork + execve + wait4 | —                                             |
 | 34 | [34-echo-server](34-echo-server/)                    | TCP echo loop with `send_all` — first real user of libsock v1.4         | —                                             |
 | 35 | [35-mmap-copy](35-mmap-copy/)                        | two live mmaps — file→file copy in userspace, no read/write for the transfer | —                                             |
+| 36 | [36-file-copy](36-file-copy/)                        | `file_copy` composed helper — 35 shows how, 36 shows use            | —                                             |
 
 Examples 1 and 2 do not have a dedicated chapter — they are the
 smallest possible programs and exist so that every later example can
