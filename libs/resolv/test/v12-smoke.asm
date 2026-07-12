@@ -37,6 +37,7 @@
 default rel
 
 extern resolv_a, resolv_aaaa, resolv_a_all
+extern panic                        ; libasm v1.1
 
 global _start
 global _main
@@ -152,14 +153,13 @@ _main:
     syscall
 
 .fail:
-    mov rax, SYS_write
-    mov edi, 2
-    lea rsi, [fail_msg]
-    mov edx, fail_len
-    syscall
-    mov rax, SYS_exit
-    mov edi, 1
-    syscall
+    ; libasm v1.1's panic writes to stderr and exits(1). The
+    ; fail_id byte was patched by whichever sub-check failed,
+    ; so fail_msg still starts with FAIL:<id>.
+    lea rdi, [fail_msg]
+    mov esi, fail_len
+    call panic
+    ; unreachable
 
 ; memeq(rdi=a, rsi=b, ecx=len) → rax = 1 if equal else 0
 memeq:
