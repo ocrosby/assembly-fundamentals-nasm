@@ -560,6 +560,15 @@ sit on top of one or more syscall wrappers. Currently:
   `+21`, Linux `+19`) offsets behind an
   `open`/`next`/`close` triple whose state lives in a
   caller-allocated opaque block.
+- [`file_copy_stream`](util/file-copy-stream.asm) *(v1.15)* —
+  `file_copy_stream(path, dst_fd)` copies the entire file at
+  `path` into an already-open fd. Sits between
+  `file_read_all` (source path → mapping) and a short-write
+  loop that streams the bytes into the caller's fd. Useful
+  for "send this file over this socket" without materializing
+  the bytes twice. Symmetric with `file_copy` (path → path);
+  where `file_copy` opens its own destination, this one
+  writes into whatever fd the caller passes.
 - [`file_append`](util/file-append.asm) *(v1.14)* —
   `file_append(path, addr, size)` tacks `size` bytes onto
   the end of the file at `path` (creating the file if

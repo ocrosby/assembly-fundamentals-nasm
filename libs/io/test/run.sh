@@ -83,6 +83,7 @@ cleanup() {
           file-read-all-smoke file-read-all-smoke.o \
           file-write-all-smoke file-write-all-smoke.o \
           file-append-smoke file-append-smoke.o \
+          file-copy-stream-smoke file-copy-stream-smoke.o \
           c-smoke /tmp/libio-c-smoke.tmp /tmp/libio-c-smoke.tmp2 \
                   /tmp/libio-c-smoke.link
     rm -rf "$dirpath" "$iter_dir" "$at_dir" \
@@ -342,6 +343,34 @@ if [ "$fap_code" -eq 0 ]; then
     printf "PASS: %-12s output=[%s]\n" "file-append-smoke" "$fap_out"
 else
     printf "FAIL: %-12s exit=%d output=[%s]\n" "file-append-smoke" "$fap_code" "$fap_out"
+    fail_total=$((fail_total + 1))
+fi
+
+# ---------------------------------------------------------------
+# file-copy-stream-smoke — v1.15 file_copy_stream composed
+# helper. The destination fd is a pipe the smoke creates; the
+# smoke reads back on the read end to verify the byte stream.
+# ---------------------------------------------------------------
+fcs_src="$(mktemp -u /tmp/libio-file-copy-stream-smoke.src.XXXXXX)"
+fcs_empty="$(mktemp -u /tmp/libio-file-copy-stream-smoke.empty.XXXXXX)"
+
+# shellcheck disable=SC2086
+nasm $nasm_fmt -I ../.. -I../syscall/ \
+    -DSRC_PATH="\"$fcs_src\"" \
+    -DEMPTY_SRC_PATH="\"$fcs_empty\"" \
+    file-copy-stream-smoke.asm -o file-copy-stream-smoke.o
+"${ld_cmd[@]}" file-copy-stream-smoke.o "${libs[@]}" -o file-copy-stream-smoke
+
+set +e
+fcs_out="$(./file-copy-stream-smoke 2>&1)"
+fcs_code=$?
+set -e
+rm -f "$fcs_src" "$fcs_empty"
+
+if [ "$fcs_code" -eq 0 ]; then
+    printf "PASS: %-12s output=[%s]\n" "file-copy-stream-smoke" "$fcs_out"
+else
+    printf "FAIL: %-12s exit=%d output=[%s]\n" "file-copy-stream-smoke" "$fcs_code" "$fcs_out"
     fail_total=$((fail_total + 1))
 fi
 
