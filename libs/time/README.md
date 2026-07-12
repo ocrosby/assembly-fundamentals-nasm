@@ -16,6 +16,18 @@ convention, and no-libc policy every archive under `libs/` follows.
 
 ## Version
 
+**v1.5** — fourth `util/` helper: `format_time_rfc1123(seconds,
+out)`, which writes the fixed-form RFC 1123 date string
+`Sun, 06 Nov 1994 08:49:37 GMT` (exactly 29 bytes, no NUL) to
+the caller's buffer given a `u64` Unix-seconds value.
+Pure integer arithmetic — Howard Hinnant's `civil_from_days`
+turns a day count into `(year, month, day)` in branchless
+code, and the weekday is `(days + 4) mod 7` since
+1970-01-01 was Thursday. Motivated by the HTTP `Date:`
+response header (RFC 7231 §7.1.1.1), but produces the same
+format RFC 5322, RFC 5321, and any other "wall clock as a
+fixed-width string" caller wants.
+
 **v1.4** — third `util/` helper: `monotonic_ms()`, a
 deliberately asymmetric wrapper. Linux gets real
 `clock_gettime(CLOCK_MONOTONIC, ...)` monotonic milliseconds;

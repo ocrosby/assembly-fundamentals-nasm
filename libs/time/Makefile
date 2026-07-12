@@ -45,6 +45,7 @@ util/%.o: util/%.asm syscall/syscall.inc
 # bash so no exec bit is required on run.sh.
 test: $(ARCHIVE)
 	$(MAKE) -C ../asm
+	$(MAKE) -C ../str                # smoke uses libstr's memcmp
 	bash ./test/run.sh
 
 clean:

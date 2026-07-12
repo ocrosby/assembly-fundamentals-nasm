@@ -71,6 +71,8 @@
 default rel
 
 extern gettimeofday, sleep_ms, getrusage, time_diff_us, now_ms, monotonic_ms
+extern format_time_rfc1123          ; libtime v1.5
+extern memcmp                       ; libstr — smoke uses it for byte-exact date compare
 extern panic                        ; libasm v1.1
 
 global _start
@@ -79,6 +81,13 @@ global _main
 section .rodata
 pass_msg: db "PASS", 10
 pass_len: equ $ - pass_msg
+
+; v1.5 fixtures — RFC 1123 date-string references.
+; Each is exactly 29 bytes, matching the fixed-form output.
+date_epoch:  db "Thu, 01 Jan 1970 00:00:00 GMT"
+date_rfc:    db "Sun, 06 Nov 1994 08:49:37 GMT"  ; RFC 7231 §7.1.1.1
+date_y2k:    db "Sat, 01 Jan 2000 00:00:00 GMT"
+date_fri:    db "Fri, 13 Feb 2009 23:31:30 GMT"  ; the 1234567890 timestamp
 
 section .data
 fail_msg: db "FAIL:?", 10
@@ -91,6 +100,7 @@ tv2: resb TIMEVAL_SIZE
 tv3: resb TIMEVAL_SIZE
 tv4: resb TIMEVAL_SIZE
 ru:  resb 144                        ; struct rusage — 144 bytes on both platforms
+buf_date: resb 32                    ; RFC 1123 output — 29 bytes + slack
 
 section .text
 
@@ -277,6 +287,66 @@ _main:
     cmp rax, 5000
     jg .fail                         ; delta bounded (5s slack)
 %endif
+
+    ; ---- v1.5: format_time_rfc1123 ------------------------
+    ; K: seconds = 0 → "Thu, 01 Jan 1970 00:00:00 GMT"
+    ;    Epoch check — proves the algorithm base case,
+    ;    the weekday offset (Thursday = 4), and every
+    ;    zero-padded field.
+    mov byte [fail_id], 'K'
+    xor edi, edi
+    lea rsi, [buf_date]
+    call format_time_rfc1123
+    lea rdi, [buf_date]
+    lea rsi, [date_epoch]
+    mov edx, 29
+    call memcmp
+    test rax, rax
+    jnz .fail
+
+    ; L: seconds = 784111777 → "Sun, 06 Nov 1994 08:49:37 GMT"
+    ;    The RFC 7231 §7.1.1.1 canonical example. Non-trivial
+    ;    year, non-Jan month, non-first day, non-zero HMS.
+    mov byte [fail_id], 'L'
+    mov rdi, 784111777
+    lea rsi, [buf_date]
+    call format_time_rfc1123
+    lea rdi, [buf_date]
+    lea rsi, [date_rfc]
+    mov edx, 29
+    call memcmp
+    test rax, rax
+    jnz .fail
+
+    ; M: seconds = 946684800 → "Sat, 01 Jan 2000 00:00:00 GMT"
+    ;    Y2K boundary — proves the century tick over from
+    ;    1999 to 2000 and that the leap-year branch in
+    ;    Hinnant's algorithm does the right thing.
+    mov byte [fail_id], 'M'
+    mov rdi, 946684800
+    lea rsi, [buf_date]
+    call format_time_rfc1123
+    lea rdi, [buf_date]
+    lea rsi, [date_y2k]
+    mov edx, 29
+    call memcmp
+    test rax, rax
+    jnz .fail
+
+    ; N: seconds = 1234567890 → "Fri, 13 Feb 2009 23:31:30 GMT"
+    ;    A memorable middle-of-the-range timestamp; catches
+    ;    off-by-one bugs in weekday, day-of-month, and the
+    ;    HH:MM:SS three-way split.
+    mov byte [fail_id], 'N'
+    mov rdi, 1234567890
+    lea rsi, [buf_date]
+    call format_time_rfc1123
+    lea rdi, [buf_date]
+    lea rsi, [date_fri]
+    mov edx, 29
+    call memcmp
+    test rax, rax
+    jnz .fail
 
     ; PASS
     mov rax, SYS_write
