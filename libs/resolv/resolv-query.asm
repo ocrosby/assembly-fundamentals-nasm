@@ -43,23 +43,22 @@ global resolv_query
 
 section .text
 
-%define AF_INET       2
-%define SOCK_DGRAM    2
-%define SOCK_STREAM   1
+; Socket-domain constants (AF_INET, SOCK_DGRAM, SOCK_STREAM,
+; SIN_HEADER, SOL_SOCKET, SO_RCVTIMEO) come from libsock's
+; syscall.inc. libresolv depends on libsock at link time; it
+; also depends on it at assembly time to keep the socket-side
+; constants from drifting.
+%include "sock/syscall/syscall.inc"
+
+; DNS-specific constants that don't belong in libsock.
 %define QUERY_MAX     512
 %define CNAME_MAX     256
 %define CNAME_HOPS    8
 %define TC_FLAG_MASK  0x02          ; bit 1 of flags byte 0 (byte 2 of msg)
 
 %ifdef MACOS
-%define SIN_HEADER    0x0210
-%define SOL_SOCKET    0xffff
-%define SO_RCVTIMEO   0x1006
 %define ELOOP_VAL     62
 %else
-%define SIN_HEADER    0x0002
-%define SOL_SOCKET    1
-%define SO_RCVTIMEO   20
 %define ELOOP_VAL     40
 %endif
 

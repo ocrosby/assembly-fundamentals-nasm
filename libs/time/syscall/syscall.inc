@@ -8,10 +8,9 @@
 ;     Linux uses the plain x86-64 syscall numbers from
 ;     <asm/unistd_64.h>.
 ;
-;   * SYSCALL_NORM — normalizes the macOS carry-flag error
-;     convention to Linux's "negative errno in rax" convention, so
-;     every wrapper returns non-negative on success and a negative
-;     errno on failure regardless of platform.
+;   * SYSCALL_NORM (and SYSCALL_ARG4, unused here but
+;     available) come from `syscall-common.inc` — every
+;     syscall-making archive under `libs/` shares that file.
 ;
 ;   * TV_SEC_OFF / TV_USEC_OFF / TIMEVAL_SIZE — struct timeval
 ;     field offsets and total size. On both macOS and Linux the
@@ -23,6 +22,8 @@
 
 %ifndef TIME_SYSCALL_INC
 %define TIME_SYSCALL_INC
+
+%include "syscall-common.inc"
 
 %ifdef MACOS
 %define SYS_gettimeofday 0x2000074
@@ -49,14 +50,5 @@
 ; libtime constants.
 %define RU_UTIME_OFF 0
 %define RU_STIME_OFF 16
-
-%macro SYSCALL_NORM 0
-    syscall
-%ifdef MACOS
-    jnc %%ok                        ; CF=0 → success
-    neg rax                         ; CF=1 → positive errno → -errno
-%%ok:
-%endif
-%endmacro
 
 %endif

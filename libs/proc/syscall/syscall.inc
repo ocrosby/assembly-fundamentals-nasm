@@ -6,18 +6,16 @@
 ; <sys/syscall.h> in the Xcode command-line SDK); Linux uses
 ; the plain x86-64 numbers from <asm/unistd_64.h>.
 ;
-; SYSCALL_NORM normalizes the macOS carry-flag error convention
-; to Linux's "negative errno in rax" convention, so every
-; wrapper returns non-negative on success and a negative errno
-; on failure regardless of platform.
-;
-; SYSCALL_ARG4 is here because wait4 is 4-arg — the System V
-; AMD64 ABI passes arg 4 in rcx, but the kernel's syscall ABI
-; clobbers rcx (return address of the syscall instruction) and
-; expects arg 4 in r10.
+; SYSCALL_NORM and SYSCALL_ARG4 come from
+; `syscall-common.inc` — every syscall-making archive
+; under `libs/` shares that file so the macros only have to
+; change in one place. wait4 is 4-arg, so libproc needs
+; SYSCALL_ARG4.
 
 %ifndef PROC_SYSCALL_INC
 %define PROC_SYSCALL_INC
+
+%include "syscall-common.inc"
 
 %ifdef MACOS
 %define SYS_fork    0x2000002
@@ -43,18 +41,5 @@
 ; with W_STOPSIG / W_CONTSIG. Values match between platforms.
 %define WNOHANG    1
 %define WUNTRACED  2
-
-%macro SYSCALL_NORM 0
-    syscall
-%ifdef MACOS
-    jnc %%ok                        ; CF=0 → success
-    neg rax                         ; CF=1 → positive errno → -errno
-%%ok:
-%endif
-%endmacro
-
-%macro SYSCALL_ARG4 0
-    mov r10, rcx                    ; 4th arg: SysV rcx → syscall r10
-%endmacro
 
 %endif

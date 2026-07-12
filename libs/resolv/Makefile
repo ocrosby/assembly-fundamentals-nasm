@@ -41,7 +41,7 @@ $(ARCHIVE): $(OBJS)
 # Every source %include's syscall.inc, so the dependency is
 # declared explicitly.
 %.o: %.asm syscall.inc
-	nasm $(NASM_FLAGS) $< -o $@
+	nasm $(NASM_FLAGS) -I .. $< -o $@
 
 # Smoke-test the resolver path end to end: build this archive
 # plus libsock (DNS transport + close + inet_pton4), libio

@@ -33,12 +33,12 @@ $(ARCHIVE): $(OBJS)
 # directory. The dependency on syscall.inc forces every wrapper
 # to rebuild when the shared header changes.
 syscall/%.o: syscall/%.asm syscall/syscall.inc
-	nasm $(NASM_FLAGS) -I syscall/ $< -o $@
+	nasm $(NASM_FLAGS) -I .. -I syscall/ $< -o $@
 
 # util/ objects also use syscall.inc (for ST_SIZE_OFF and
 # STATBUF_SIZE), so they share the same -I flag and dependency.
 util/%.o: util/%.asm syscall/syscall.inc
-	nasm $(NASM_FLAGS) -I syscall/ $< -o $@
+	nasm $(NASM_FLAGS) -I .. -I syscall/ $< -o $@
 
 # Smoke-test the file-syscall path end to end: build this archive
 # and libsock.a (its read/write/close are reused by the smoke

@@ -38,7 +38,7 @@ fail_total=0
 # time-smoke — needs syscall.inc for TIMEVAL_SIZE and TV_*_OFF.
 # ---------------------------------------------------------------
 # shellcheck disable=SC2086
-nasm $nasm_fmt -I../syscall/ time-smoke.asm -o time-smoke.o
+nasm $nasm_fmt -I ../.. -I../syscall/ time-smoke.asm -o time-smoke.o
 "${ld_cmd[@]}" time-smoke.o "${libs[@]}" -o time-smoke
 
 set +e
