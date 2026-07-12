@@ -103,6 +103,13 @@ A progressive walkthrough of x86-64 assembly with NASM. Each guide is intentiona
   the caller-supplied buffer with no hidden state, the
   `DT_*` type constants, and the macOS `getdirentries64`
   / Linux `getdents64` split the wrapper hides.
+- [Growable byte buffer](39-growable-buffer.md) — libbuf's
+  mmap-backed byte vector, the `struct buf` layout, the
+  `max(cap*2, needed)` grow strategy rounded to
+  `BUF_PAGE_SIZE`, why a grow relocates the mapping
+  (`mmap` + `memcpy` + `munmap`, portable across macOS
+  and Linux), and the pointer-stability contract that
+  falls out of it.
 
 ## Appendix
 
