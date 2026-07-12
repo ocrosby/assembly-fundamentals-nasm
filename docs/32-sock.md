@@ -113,6 +113,10 @@ same port without hard-coding one.
 - [`examples/34-echo-server`](../examples/34-echo-server/)
   and [`examples/43-file-server`](../examples/43-file-server/)
   — runnables that exercise the server dance end to end.
+- [`examples/49-poll`](../examples/49-poll/) — the
+  smallest `poll` demo: one pipe, one `struct pollfd`,
+  the timeout path and the `POLLIN` ready path in one
+  program.
 
 ## Next
 

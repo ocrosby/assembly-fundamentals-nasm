@@ -108,6 +108,9 @@ getting a wall clock, not a monotonic one.
   every wrapper's per-symbol contract.
 - [`27-libraries.md`](27-libraries.md) — the archive
   index this chapter is a companion to.
+- [`examples/47-timing`](../examples/47-timing/) — the
+  runnable that brackets `sleep_ms(50)` with two `now_ms`
+  reads and asserts the elapsed window.
 
 ## Next
 

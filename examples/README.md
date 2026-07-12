@@ -1,9 +1,10 @@
 # Runnable Examples
 
 A constructive sequence of small x86-64 NASM programs. Each example
-introduces exactly one new atomic concept on top of the previous one,
-so reading from `01` to `34` walks the entire control-and-data
-vocabulary needed for the early chapters of [../docs/](../docs/).
+introduces exactly one new atomic concept on top of the previous one.
+Examples `01`–`24` walk the control-and-data vocabulary tracked by the
+early chapters of [../docs/](../docs/); `25` onward exercises the
+archives under [../libs/](../libs/).
 
 ## The sequence
 
