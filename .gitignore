@@ -29,6 +29,7 @@ libs/io/test/file-copy-smoke
 libs/io/test/file-read-all-smoke
 libs/io/test/file-write-all-smoke
 libs/io/test/file-append-smoke
+libs/io/test/file-copy-stream-smoke
 libs/io/test/c-smoke
 libs/resolv/test/resolv-smoke
 libs/resolv/test/v12-smoke
