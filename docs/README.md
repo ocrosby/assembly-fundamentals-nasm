@@ -62,6 +62,11 @@ A progressive walkthrough of x86-64 assembly with NASM. Each guide is intentiona
   / `file_write_all` / `file_append` / `file_copy`), the
   O_TRUNC vs O_APPEND distinction, short-write handling, and
   the ownership contract for the mmap `file_read_all` returns.
+- [Strings and byte buffers](31-str.md) — libstr's three
+  families (raw-byte, NUL-terminated string, integer
+  conversion), why every scan is byte-at-a-time, the
+  `strcpy` contract and the `strncpy` non-decision, and
+  `LLONG_MIN` handling in `itoa`.
 
 ## Appendix
 
