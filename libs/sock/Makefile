@@ -47,11 +47,14 @@ inet/%.o: inet/%.asm
 util/%.o: util/%.asm syscall/syscall.inc
 	nasm $(NASM_FLAGS) -I .. -I syscall/ $< -o $@
 
-# Smoke-test the socket path end to end: build this archive and
-# libasm.a, then run the loopback client/server harness. Requires
-# python3. Invoked via bash so no exec bit is required on run.sh.
+# Smoke-test the socket path end to end. Build this archive and
+# its co-dependencies: libasm (for panic on .fail paths) and
+# libstr (for inet4-smoke's strcmp and inet6-smoke's memcmp +
+# strcmp). Requires python3. Invoked via bash so no exec bit is
+# required on run.sh.
 test: $(ARCHIVE)
 	$(MAKE) -C ../asm
+	$(MAKE) -C ../str
 	bash ./test/run.sh
 
 clean:

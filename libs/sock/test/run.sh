@@ -53,7 +53,11 @@ case "$(uname -s)" in
         ;;
 esac
 
-libs=(../libsock.a ../../asm/libasm.a)
+# libstr.a joins the link line for inet4-smoke's strcmp and
+# inet6-smoke's memcmp+strcmp usage. The linker only pulls in
+# objects for unresolved symbols, so libstr.a is inert for the
+# smokes that do not reach into it.
+libs=(../libsock.a ../../asm/libasm.a ../../str/libstr.a)
 fail_total=0
 
 # ---------------------------------------------------------------

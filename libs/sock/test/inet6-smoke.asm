@@ -35,6 +35,7 @@
 ; write() and exit() go straight to the kernel.
 
 extern inet_pton6, inet_ntop6
+extern memcmp, strcmp               ; libstr v1.0
 
 %ifdef MACOS
 %define SYS_write 0x2000004
@@ -437,16 +438,15 @@ pton_ok:
     call inet_pton6
     cmp rax, 1
     jne .po_fail
-    xor ecx, ecx
-.po_loop:
-    cmp ecx, 16
-    jge .po_ok
-    mov al, [r12 + rcx]
-    cmp al, [r13 + rcx]
-    jne .po_fail
-    inc ecx
-    jmp .po_loop
-.po_ok:
+    ; Compare the 16-byte inet6 address with the expected
+    ; reference via libstr's memcmp. Replaces the byte-loop
+    ; that read the same bytes one at a time.
+    mov rdi, r12
+    mov rsi, r13
+    mov edx, 16
+    call memcmp
+    test rax, rax
+    jnz .po_fail
     pop r14
     pop r13
     pop r12
@@ -482,20 +482,14 @@ ntop_ok:
     call inet_ntop6
     test rax, rax
     jz .no_fail
-    ; strcmp outbuf, r12
+    ; libstr's strcmp: outbuf vs r12. Returns 0 on match.
+    ; Replaces the byte-loop that walked both strings one
+    ; character at a time.
     lea rdi, [outbuf]
     mov rsi, r12
-.no_loop:
-    mov al, [rdi]
-    mov cl, [rsi]
-    cmp al, cl
-    jne .no_fail
-    test al, al
-    jz .no_ok
-    inc rdi
-    inc rsi
-    jmp .no_loop
-.no_ok:
+    call strcmp
+    test rax, rax
+    jnz .no_fail
     pop r12
     pop rbx
     ret

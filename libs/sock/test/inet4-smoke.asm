@@ -22,6 +22,7 @@
 ; kernel so the harness stays purely a client of the library.
 
 extern htons, ntohs, htonl, ntohl, inet_pton4, inet_ntop4
+extern strcmp                       ; libstr v1.0
 
 %ifdef MACOS
 %define SYS_write 0x2000004
@@ -139,9 +140,9 @@ _main:
     jz .fail
     lea rdi, [outstr]
     lea rsi, [addr_ok]
-    call streq
+    call strcmp
     test rax, rax
-    jz .fail
+    jnz .fail                       ; strcmp returns 0 on match
 
     ; T11: inet_ntop4(x, out, 15) == NULL (too small)
     xor edi, edi
@@ -215,20 +216,3 @@ _main:
     mov edi, 1
     syscall
 
-; streq(s1, s2) -> rax = 1 if the two NUL-terminated strings match
-streq:
-    xor eax, eax
-.next:
-    mov cl, [rdi]
-    mov dl, [rsi]
-    cmp cl, dl
-    jne .no
-    test cl, cl
-    jz .yes
-    inc rdi
-    inc rsi
-    jmp .next
-.yes:
-    mov eax, 1
-.no:
-    ret
