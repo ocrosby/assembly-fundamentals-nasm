@@ -31,13 +31,13 @@ $(ARCHIVE): $(OBJS)
 # directory. The dependency on syscall.inc forces every wrapper
 # to rebuild when the shared header changes.
 syscall/%.o: syscall/%.asm syscall/syscall.inc
-	nasm $(NASM_FLAGS) -I syscall/ $< -o $@
+	nasm $(NASM_FLAGS) -I .. -I syscall/ $< -o $@
 
 # util/ helpers compose syscall wrappers and also %include
 # "syscall.inc" for the SYS_exit / SYS_execve constants used
 # on the child-side exec failure path.
 util/%.o: util/%.asm syscall/syscall.inc
-	nasm $(NASM_FLAGS) -I syscall/ $< -o $@
+	nasm $(NASM_FLAGS) -I .. -I syscall/ $< -o $@
 
 # Smoke-test the archive end to end. Invoked via bash so no exec
 # bit is required on run.sh.

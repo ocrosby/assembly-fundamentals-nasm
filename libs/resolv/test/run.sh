@@ -140,7 +140,7 @@ if [ -z "$port" ]; then
     fail_total=$((fail_total + 1))
 else
     # shellcheck disable=SC2086
-    nasm $nasm_fmt -DDNS_PORT="$port" resolv-smoke.asm -o resolv-smoke.o
+    nasm $nasm_fmt -I ../.. -DDNS_PORT="$port" resolv-smoke.asm -o resolv-smoke.o
     "${ld_cmd[@]}" resolv-smoke.o "${libs[@]}" -o resolv-smoke
 
     set +e
@@ -180,7 +180,7 @@ if [ -z "$port2" ]; then
     fail_total=$((fail_total + 1))
 else
     # shellcheck disable=SC2086
-    nasm $nasm_fmt -DDNS_PORT="$port2" v12-smoke.asm -o v12-smoke.o
+    nasm $nasm_fmt -I ../.. -DDNS_PORT="$port2" v12-smoke.asm -o v12-smoke.o
     "${ld_cmd[@]}" v12-smoke.o "${libs[@]}" -o v12-smoke
 
     set +e
@@ -220,7 +220,7 @@ if [ -z "$port3" ]; then
     fail_total=$((fail_total + 1))
 else
     # shellcheck disable=SC2086
-    nasm $nasm_fmt -DDNS_PORT="$port3" v16-smoke.asm -o v16-smoke.o
+    nasm $nasm_fmt -I ../.. -DDNS_PORT="$port3" v16-smoke.asm -o v16-smoke.o
     "${ld_cmd[@]}" v16-smoke.o "${libs[@]}" -o v16-smoke
 
     set +e
@@ -243,7 +243,7 @@ fi
 # hosts-smoke — parses the /etc/hosts fixture. Standalone.
 # ---------------------------------------------------------------
 # shellcheck disable=SC2086
-nasm $nasm_fmt -DHOSTS_PATH="\"$hosts_fixture\"" hosts-smoke.asm -o hosts-smoke.o
+nasm $nasm_fmt -I ../.. -DHOSTS_PATH="\"$hosts_fixture\"" hosts-smoke.asm -o hosts-smoke.o
 "${ld_cmd[@]}" hosts-smoke.o "${libs[@]}" -o hosts-smoke
 
 set +e
@@ -262,7 +262,7 @@ fi
 # resolvconf-smoke — parses the /etc/resolv.conf fixture.
 # ---------------------------------------------------------------
 # shellcheck disable=SC2086
-nasm $nasm_fmt \
+nasm $nasm_fmt -I ../.. \
     -DCONF_PATH="\"$conf_fixture\"" \
     -DCONF_EMPTY_PATH="\"$conf_empty_fixture\"" \
     -DCONF_PORTS_PATH="\"$conf_ports_fixture\"" \
@@ -325,7 +325,7 @@ nameserver 127.0.0.1:$port3
 HSEOF
 
     # shellcheck disable=SC2086
-    nasm $nasm_fmt \
+    nasm $nasm_fmt -I ../.. \
         -DHOSTS_PATH="\"$hostname_hosts_fixture\"" \
         -DCONF_PATH="\"$hostname_conf_fixture\"" \
         -DFAILOVER_CONF_PATH="\"$hostname_failover_conf\"" \
@@ -353,7 +353,7 @@ fi
 # fail-smoke — standalone (no server, no libsock needed).
 # ---------------------------------------------------------------
 # shellcheck disable=SC2086
-nasm $nasm_fmt fail-smoke.asm -o fail-smoke.o
+nasm $nasm_fmt -I ../.. fail-smoke.asm -o fail-smoke.o
 "${ld_cmd[@]}" fail-smoke.o ../libresolv.a -o fail-smoke
 
 set +e

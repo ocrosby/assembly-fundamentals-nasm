@@ -62,7 +62,7 @@ fail_total=0
 run_standalone() {
     local name="$1"
     # shellcheck disable=SC2086  # nasm_fmt is intentionally word-split
-    nasm $nasm_fmt "${name}.asm" -o "${name}.o"
+    nasm $nasm_fmt -I ../.. "${name}.asm" -o "${name}.o"
     "${ld_cmd[@]}" "${name}.o" "${libs[@]}" -o "${name}"
 
     set +e
@@ -121,7 +121,7 @@ if [ -z "$port" ]; then
     fail_total=$((fail_total + 1))
 else
     # shellcheck disable=SC2086
-    nasm $nasm_fmt -DPORT="$port" tcp-smoke.asm -o tcp-smoke.o
+    nasm $nasm_fmt -I ../.. -DPORT="$port" tcp-smoke.asm -o tcp-smoke.o
     "${ld_cmd[@]}" tcp-smoke.o "${libs[@]}" -o tcp-smoke
 
     set +e
@@ -145,7 +145,7 @@ fi
 # client (server-client.py) drives the exchange.
 # ---------------------------------------------------------------
 # shellcheck disable=SC2086
-nasm $nasm_fmt server-smoke.asm -o server-smoke.o
+nasm $nasm_fmt -I ../.. server-smoke.asm -o server-smoke.o
 "${ld_cmd[@]}" server-smoke.o "${libs[@]}" -o server-smoke
 
 srv_out="$tmp/server-out"

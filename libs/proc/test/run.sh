@@ -39,7 +39,7 @@ fail_total=0
 # proc-smoke — needs syscall.inc for WNOHANG-style constants.
 # ---------------------------------------------------------------
 # shellcheck disable=SC2086
-nasm $nasm_fmt -I../syscall/ proc-smoke.asm -o proc-smoke.o
+nasm $nasm_fmt -I ../.. -I../syscall/ proc-smoke.asm -o proc-smoke.o
 "${ld_cmd[@]}" proc-smoke.o "${libs[@]}" -o proc-smoke
 
 set +e

@@ -92,7 +92,7 @@ fail_total=0
 # shellcheck disable=SC2086  # nasm_fmt is intentionally word-split
 # -I syscall/ so the smoke test can %include the shared header
 # to pick up STATBUF_SIZE / ST_SIZE_OFF for its fstat check.
-nasm $nasm_fmt -I../syscall/ \
+nasm $nasm_fmt -I ../.. -I../syscall/ \
     -DTMPFILE="\"$tmpfile\"" \
     -DDIRPATH="\"$dirpath\"" \
     -DRENAMED_PATH="\"$renamed_path\"" \
@@ -119,7 +119,7 @@ fi
 # fail-smoke — standalone, no runtime state.
 # ---------------------------------------------------------------
 # shellcheck disable=SC2086
-nasm $nasm_fmt fail-smoke.asm -o fail-smoke.o
+nasm $nasm_fmt -I ../.. fail-smoke.asm -o fail-smoke.o
 "${ld_cmd[@]}" fail-smoke.o "${libs[@]}" -o fail-smoke
 
 set +e
@@ -138,7 +138,7 @@ fi
 # fdgraph-smoke — v1.7 dup / dup2 / pipe.
 # ---------------------------------------------------------------
 # shellcheck disable=SC2086
-nasm $nasm_fmt fdgraph-smoke.asm -o fdgraph-smoke.o
+nasm $nasm_fmt -I ../.. fdgraph-smoke.asm -o fdgraph-smoke.o
 "${ld_cmd[@]}" fdgraph-smoke.o "${libs[@]}" -o fdgraph-smoke
 
 set +e
@@ -160,7 +160,7 @@ fi
 # ---------------------------------------------------------------
 lockfile="$(mktemp -u /tmp/libio-fcntl-smoke.XXXXXX)"
 # shellcheck disable=SC2086
-nasm $nasm_fmt -I../syscall/ \
+nasm $nasm_fmt -I ../.. -I../syscall/ \
     -DTMPFILE_LOCK="\"$lockfile\"" \
     fcntl-smoke.asm -o fcntl-smoke.o
 "${ld_cmd[@]}" fcntl-smoke.o "${libs[@]}" -o fcntl-smoke
@@ -183,7 +183,7 @@ fi
 # for PROT_* / MAP_* constants.
 # ---------------------------------------------------------------
 # shellcheck disable=SC2086
-nasm $nasm_fmt -I../syscall/ mmap-smoke.asm -o mmap-smoke.o
+nasm $nasm_fmt -I ../.. -I../syscall/ mmap-smoke.asm -o mmap-smoke.o
 "${ld_cmd[@]}" mmap-smoke.o "${libs[@]}" -o mmap-smoke
 
 set +e
@@ -206,7 +206,7 @@ fi
 # and the IOV_*_OFF constants.
 # ---------------------------------------------------------------
 # shellcheck disable=SC2086
-nasm $nasm_fmt -I../syscall/ iov-smoke.asm -o iov-smoke.o
+nasm $nasm_fmt -I ../.. -I../syscall/ iov-smoke.asm -o iov-smoke.o
 "${ld_cmd[@]}" iov-smoke.o "${libs[@]}" -o iov-smoke
 
 set +e

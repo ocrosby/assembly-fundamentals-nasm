@@ -35,7 +35,7 @@ $(ARCHIVE): $(OBJS)
 # directory. The dependency on syscall.inc forces every wrapper
 # to rebuild when the shared header changes.
 syscall/%.o: syscall/%.asm syscall/syscall.inc
-	nasm $(NASM_FLAGS) -I syscall/ $< -o $@
+	nasm $(NASM_FLAGS) -I .. -I syscall/ $< -o $@
 
 # inet/ helpers are self-contained — no shared header, no syscall.
 inet/%.o: inet/%.asm
@@ -45,7 +45,7 @@ inet/%.o: inet/%.asm
 # syscall.inc for the AF_INET / SIN_HEADER / SOL_SOCKET constants
 # and the SYSCALL_* macros.
 util/%.o: util/%.asm syscall/syscall.inc
-	nasm $(NASM_FLAGS) -I syscall/ $< -o $@
+	nasm $(NASM_FLAGS) -I .. -I syscall/ $< -o $@
 
 # Smoke-test the socket path end to end: build this archive and
 # libasm.a, then run the loopback client/server harness. Requires

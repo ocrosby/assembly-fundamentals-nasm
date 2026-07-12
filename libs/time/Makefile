@@ -32,13 +32,13 @@ $(ARCHIVE): $(OBJS)
 # directory. The dependency on syscall.inc forces every wrapper
 # to rebuild when the shared header changes.
 syscall/%.o: syscall/%.asm syscall/syscall.inc
-	nasm $(NASM_FLAGS) -I syscall/ $< -o $@
+	nasm $(NASM_FLAGS) -I .. -I syscall/ $< -o $@
 
 # util/ helpers %include "syscall.inc" for shared constants
 # (TV_SEC_OFF / TV_USEC_OFF / TIMEVAL_SIZE) even though they
 # never call the kernel.
 util/%.o: util/%.asm syscall/syscall.inc
-	nasm $(NASM_FLAGS) -I syscall/ $< -o $@
+	nasm $(NASM_FLAGS) -I .. -I syscall/ $< -o $@
 
 # Smoke-test the archive end to end. Invoked via bash so no exec
 # bit is required on run.sh.

@@ -55,10 +55,13 @@ extern socket, connect, close      ; libsock
 
 global resolv_dial
 
-section .text
+; AF_INET and SOCK_STREAM come from libsock's syscall.inc —
+; libresolv already depends on libsock for socket + connect +
+; close, so trusting its constant definitions here keeps the
+; two archives in lockstep.
+%include "sock/syscall/syscall.inc"
 
-%define AF_INET      2
-%define SOCK_STREAM  1
+section .text
 
 resolv_dial:
     push r12

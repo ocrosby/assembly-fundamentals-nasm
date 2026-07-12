@@ -8,31 +8,20 @@
 ; poll for finer-grained timeout, for example — additional
 ; SYS_* defines land alongside.
 ;
-; The SYSCALL_NORM / SYSCALL_ARG4 macros are duplicated across
-; libsock, libio, and libresolv so each archive stays self-
-; contained. If a fourth archive lands with the same pattern
-; the shared macros should promote to a libs/-level include.
+; SYSCALL_NORM and SYSCALL_ARG4 come from
+; `syscall-common.inc` — every syscall-making archive
+; under `libs/` shares that file so the macros only have to
+; change in one place.
 
 %ifndef LIBRESOLV_SYSCALL_INC
 %define LIBRESOLV_SYSCALL_INC
+
+%include "syscall-common.inc"
 
 %ifdef MACOS
 %define SYS_getentropy 0x20001f4
 %else
 %define SYS_getrandom  318
 %endif
-
-%macro SYSCALL_NORM 0
-    syscall
-%ifdef MACOS
-    jnc %%ok                        ; CF=0 → success
-    neg rax                         ; CF=1 → positive errno → -errno
-%%ok:
-%endif
-%endmacro
-
-%macro SYSCALL_ARG4 0
-    mov r10, rcx                    ; 4th arg: SysV rcx → syscall r10
-%endmacro
 
 %endif ; LIBRESOLV_SYSCALL_INC
