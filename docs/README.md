@@ -54,6 +54,10 @@ A progressive walkthrough of x86-64 assembly with NASM. Each guide is intentiona
   `SIG_SETMASK`, why `sigaction` is deferred, and how the
   block-mask pattern replaces "ignore this signal" until
   handler installation lands.
+- [Processes](29-processes.md) — libproc's process-control
+  model: `fork` returning twice, `execve` replacing the
+  image, `wait4` status-word interpretation, and the
+  `spawn_wait` composed helper.
 
 ## Appendix
 
