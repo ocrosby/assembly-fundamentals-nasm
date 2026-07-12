@@ -48,6 +48,7 @@ vocabulary needed for the early chapters of [../docs/](../docs/).
 | 37 | [37-config-load](37-config-load/)                    | libio + libstr on the same buffer — `file_read_all` + `memcmp` + `strchr` + `atoi` | —                                             |
 | 38 | [38-signal-block](38-signal-block/)                  | first libsig user — block SIGPIPE, write to a broken pipe, observe pending | —                                             |
 | 39 | [39-number-store](39-number-store/)                  | itoa + atoi round-trip through `file_write_all` and `file_read_all`   | —                                             |
+| 40 | [40-fork-signal](40-fork-signal/)                    | first libproc `kill` user — fork, SIGTERM, wait4 status decode      | —                                             |
 
 Examples 1 and 2 do not have a dedicated chapter — they are the
 smallest possible programs and exist so that every later example can
