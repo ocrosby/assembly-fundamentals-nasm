@@ -67,6 +67,16 @@ A progressive walkthrough of x86-64 assembly with NASM. Each guide is intentiona
   conversion), why every scan is byte-at-a-time, the
   `strcpy` contract and the `strncpy` non-decision, and
   `LLONG_MIN` handling in `itoa`.
+- [Sockets and networking](32-sock.md) — libsock's Berkeley
+  sockets primer: `struct sockaddr_in` layout and the
+  `SIN_HEADER` macOS/Linux difference, byte-order helpers,
+  the `send_all` short-write loop, and the
+  `server_bind_listen` / `client_connect` composed helpers.
+- [Time](33-time.md) — libtime's wall/CPU-clock story:
+  `struct timeval` layout, `sleep_ms` via the `poll` trick,
+  `getrusage`, `now_ms` / `time_diff_us` helpers, and the
+  deliberate macOS asymmetry in `monotonic_ms`
+  (Linux `CLOCK_MONOTONIC`, macOS `-ENOSYS`).
 
 ## Appendix
 
