@@ -62,6 +62,12 @@
 %define SA_TRAMP_OFF    8
 %define SA_MASK_OFF     16
 %define SA_FLAGS_OFF    20
+
+; macOS SYS_sigreturn (184) — return-from-signal-handler
+; syscall the v1.3 `sig_tramp` trampoline uses to unwind the
+; signal frame. Not exposed as a public wrapper (only
+; sig_tramp consumes it).
+%define SYS_sigreturn   0x20000b8   ; 184
 %else
 ; Linux uses the rt_sig* variants (kernel signals 1..64). The
 ; legacy sig* variants exist for 32-bit compat and take a
@@ -92,6 +98,19 @@
 %define SA_FLAGS_OFF    8
 %define SA_RESTORER_OFF 16
 %define SA_MASK_OFF     24
+
+; SA_RESTORER — the sa_flags bit that tells the kernel to
+; jump to sa_restorer when the handler returns instead of
+; letting the (nonexistent) libc restore path run. Real
+; handlers installed via v1.3's `sig_restorer` must OR this
+; into sa_flags.
+%define SA_RESTORER     0x04000000
+
+; Linux SYS_rt_sigreturn (15) — return-from-signal-handler
+; syscall the v1.3 `sig_restorer` trampoline uses to unwind
+; the signal frame. Not exposed as a public wrapper (only
+; sig_restorer consumes it).
+%define SYS_rt_sigreturn 15
 %endif
 
 ; Handler dispositions — SIG_DFL restores the default action
@@ -100,11 +119,15 @@
 ; deliveries silently — the process observes the syscall
 ; return but no handler runs.
 ;
-; Custom handler functions (a pointer to caller-owned code
-; that returns) are NOT yet supported. Installing one requires
-; a SA_RESTORER trampoline on Linux and an sa_tramp trampoline
-; on macOS — both deferred to v1.3 pending a clean
-; cross-platform design.
+; Custom handler functions are supported starting v1.3 via
+; the per-platform trampolines shipped as `sig_restorer`
+; (Linux — see `util/sig-restorer.asm`) and `sig_tramp`
+; (macOS — see `util/sig-tramp.asm`). Callers set
+; sa_handler to their handler function pointer and, per
+; platform, either set SA_RESTORER in sa_flags with
+; sa_restorer = sig_restorer, or set sa_tramp = sig_tramp
+; directly. Both trampolines call the appropriate
+; sigreturn variant after the handler completes.
 %define SIG_DFL         0
 %define SIG_IGN         1
 
