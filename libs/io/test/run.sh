@@ -195,6 +195,29 @@ else
 fi
 
 # ---------------------------------------------------------------
+# iov-smoke — v1.10 readv + writev. Uses libio's own pipe() to
+# create a fixture and then send three 4-byte chunks via writev,
+# receive them into two 6-byte iovecs via readv, and verify the
+# split lines up. Needs the shared syscall.inc for IOVEC_SIZE
+# and the IOV_*_OFF constants.
+# ---------------------------------------------------------------
+# shellcheck disable=SC2086
+nasm $nasm_fmt -I../syscall/ iov-smoke.asm -o iov-smoke.o
+"${ld_cmd[@]}" iov-smoke.o "${libs[@]}" -o iov-smoke
+
+set +e
+iov_out="$(./iov-smoke 2>&1)"
+iov_code=$?
+set -e
+
+if [ "$iov_code" -eq 0 ]; then
+    printf "PASS: %-12s output=[%s]\n" "iov-smoke" "$iov_out"
+else
+    printf "FAIL: %-12s exit=%d output=[%s]\n" "iov-smoke" "$iov_code" "$iov_out"
+    fail_total=$((fail_total + 1))
+fi
+
+# ---------------------------------------------------------------
 # c-smoke — cc against libio.a. Force -arch x86_64 on Darwin so
 # clang matches the archive built by nasm -f macho64.
 # ---------------------------------------------------------------
