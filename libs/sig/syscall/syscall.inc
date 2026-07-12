@@ -41,6 +41,10 @@
 %define SYS_sigprocmask 0x2000030   ; 48
 %define SYS_sigpending  0x2000034   ; 52
 %define SYS_sigaction   0x200002e   ; 46
+%define SYS_sigsuspend  0x200006f   ; 111 — Darwin passes the sigset_t
+                                    ; BY VALUE in edi (32-bit mask),
+                                    ; not by pointer. Wrapper
+                                    ; dereferences the caller's ptr.
 %define SIGSET_BYTES    4
 
 ; macOS SIG_* how values (see /usr/include/sys/signal.h).
@@ -77,6 +81,9 @@
 %define SYS_sigprocmask 14          ; rt_sigprocmask
 %define SYS_sigpending  127         ; rt_sigpending
 %define SYS_sigaction   13          ; rt_sigaction
+%define SYS_sigsuspend  130         ; rt_sigsuspend — takes a
+                                    ; pointer plus sigsetsize
+                                    ; (like the other rt_sig* calls).
 %define SIGSET_BYTES    8
 
 ; Linux SIG_* how values (see /usr/include/bits/sigaction.h).
