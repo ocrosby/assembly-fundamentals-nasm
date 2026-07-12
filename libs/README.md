@@ -33,6 +33,7 @@ All archives in this directory share the same conventions:
 | [`proc/`](proc/)  | `libproc.a` | Process control from `<unistd.h>` / `<sys/wait.h>` / `<signal.h>` — `fork`, `execve`, `wait4`, `getpid`, `getppid`, `kill`, plus a `spawn_wait` composed helper. |
 | [`str/`](str/)    | `libstr.a`  | Byte-manipulation helpers (`memcpy`, `memset`, `memcmp`, `memchr`, `strlen`, `strcmp`, `strncmp`, `strchr`, `strcpy`) plus decimal integer conversion (`atoi`, `itoa`). Pure computation — no syscalls, no per-platform paths. |
 | [`sig/`](sig/)    | `libsig.a`  | POSIX signal primitives — `sigprocmask`, `sigpending`, and `sigaction`. SIG_DFL/SIG_IGN on both platforms; custom handlers on Linux via v1.3's `sig_restorer` SA_RESTORER trampoline. macOS custom handlers deferred pending sa_tramp / SYS_sigreturn-token work. Per-platform SIG_* and struct sigaction offsets normalized in `syscall.inc`. |
+| [`buf/`](buf/)    | `libbuf.a`  | Mmap-backed growable byte buffer — `buf_init`, `buf_reserve`, `buf_append`, `buf_reset`, `buf_free` around a 24-byte caller-owned `struct buf`. Grow strategy is `max(cap*2, needed)` rounded to `BUF_PAGE_SIZE`; a grow relocates the mapping (`mmap`-copy-`munmap`, no `mremap`), so pointers into `data` must be reread after any call that can grow. Composes `libio`'s `mmap` / `munmap`; owns no raw syscalls. |
 
 Each subdirectory's `README.md` documents the exported symbols and
 calling conventions for that archive.
@@ -50,6 +51,7 @@ make -C libs/time
 make -C libs/proc
 make -C libs/str
 make -C libs/sig
+make -C libs/buf
 ```
 
 There is no aggregate `libs/Makefile` yet — each archive has its own
