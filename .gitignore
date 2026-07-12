@@ -40,6 +40,7 @@ libs/time/test/c-smoke
 libs/proc/test/proc-smoke
 libs/proc/test/c-smoke
 libs/str/test/str-smoke
+libs/sig/test/sig-smoke
 
 # Python cache under mock server directory
 libs/resolv/test/__pycache__/

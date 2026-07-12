@@ -155,3 +155,7 @@ jobs:
       - name: Build and smoke-test the string library
         shell: bash
         run: make -C libs/str test
+
+      - name: Build and smoke-test the signal library
+        shell: bash
+        run: make -C libs/sig test
