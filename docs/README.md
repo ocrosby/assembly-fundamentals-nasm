@@ -49,6 +49,11 @@ A progressive walkthrough of x86-64 assembly with NASM. Each guide is intentiona
   archives under `libs/` that later examples opt into: what they
   cover, the shared calling and error convention, the dependency
   graph, and how to link.
+- [Signals](28-signals.md) — the POSIX signal model as libsig
+  sees it: sigset bitmap layout, `SIG_BLOCK` / `SIG_UNBLOCK` /
+  `SIG_SETMASK`, why `sigaction` is deferred, and how the
+  block-mask pattern replaces "ignore this signal" until
+  handler installation lands.
 
 ## Appendix
 
