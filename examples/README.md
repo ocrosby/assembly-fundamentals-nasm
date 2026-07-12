@@ -51,6 +51,7 @@ vocabulary needed for the early chapters of [../docs/](../docs/).
 | 40 | [40-fork-signal](40-fork-signal/)                    | first libproc `kill` user — fork, SIGTERM, wait4 status decode      | —                                             |
 | 41 | [41-logger](41-logger/)                              | full libio I/O family — `file_write_all` + `file_append` + `file_read_all` | —                                             |
 | 42 | [42-signal-handler](42-signal-handler/)              | custom SIGPIPE handler (Linux via v1.3 `sig_restorer`; macOS falls back to SIG_IGN) | —                                             |
+| 43 | [43-file-server](43-file-server/)                    | `file_copy_stream` sends a file over TCP; libsock + libio + libproc in one flow | —                                             |
 
 Examples 1 and 2 do not have a dedicated chapter — they are the
 smallest possible programs and exist so that every later example can
