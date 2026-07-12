@@ -77,6 +77,7 @@ cleanup() {
           fail-smoke fail-smoke.o \
           fdgraph-smoke fdgraph-smoke.o \
           fcntl-smoke fcntl-smoke.o \
+          file-copy-smoke file-copy-smoke.o \
           c-smoke /tmp/libio-c-smoke.tmp /tmp/libio-c-smoke.tmp2 \
                   /tmp/libio-c-smoke.link
     rm -rf "$dirpath" "$iter_dir" "$at_dir" \
@@ -218,6 +219,39 @@ if [ "$iov_code" -eq 0 ]; then
     printf "PASS: %-12s output=[%s]\n" "iov-smoke" "$iov_out"
 else
     printf "FAIL: %-12s exit=%d output=[%s]\n" "iov-smoke" "$iov_code" "$iov_out"
+    fail_total=$((fail_total + 1))
+fi
+
+# ---------------------------------------------------------------
+# file-copy-smoke — v1.11 file_copy composed helper. Needs three
+# mktemp'd paths: a src (seeded with "HELLO WORLD!"), a dst that
+# the helper creates, and an empty-src fixture for the zero-length
+# short-circuit. Cleanup at the end wipes the empty-dst too.
+# ---------------------------------------------------------------
+fcp_src="$(mktemp -u /tmp/libio-file-copy-smoke.src.XXXXXX)"
+fcp_dst="$(mktemp -u /tmp/libio-file-copy-smoke.dst.XXXXXX)"
+fcp_empty_src="$(mktemp -u /tmp/libio-file-copy-smoke.esrc.XXXXXX)"
+fcp_empty_dst="$(mktemp -u /tmp/libio-file-copy-smoke.edst.XXXXXX)"
+
+# shellcheck disable=SC2086
+nasm $nasm_fmt -I ../.. -I../syscall/ \
+    -DSRC_PATH="\"$fcp_src\"" \
+    -DDST_PATH="\"$fcp_dst\"" \
+    -DEMPTY_SRC_PATH="\"$fcp_empty_src\"" \
+    -DEMPTY_DST_PATH="\"$fcp_empty_dst\"" \
+    file-copy-smoke.asm -o file-copy-smoke.o
+"${ld_cmd[@]}" file-copy-smoke.o "${libs[@]}" -o file-copy-smoke
+
+set +e
+fcp_out="$(./file-copy-smoke 2>&1)"
+fcp_code=$?
+set -e
+rm -f "$fcp_src" "$fcp_dst" "$fcp_empty_src" "$fcp_empty_dst"
+
+if [ "$fcp_code" -eq 0 ]; then
+    printf "PASS: %-12s output=[%s]\n" "file-copy-smoke" "$fcp_out"
+else
+    printf "FAIL: %-12s exit=%d output=[%s]\n" "file-copy-smoke" "$fcp_code" "$fcp_out"
     fail_total=$((fail_total + 1))
 fi
 

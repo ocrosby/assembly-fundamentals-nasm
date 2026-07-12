@@ -560,6 +560,20 @@ sit on top of one or more syscall wrappers. Currently:
   `+21`, Linux `+19`) offsets behind an
   `open`/`next`/`close` triple whose state lives in a
   caller-allocated opaque block.
+- [`file_copy`](util/file-copy.asm) *(v1.11)* —
+  `file_copy(src_path, dst_path)` folds the two-mmap file
+  copy pattern (see
+  [`examples/35-mmap-copy/`](../../examples/35-mmap-copy/))
+  into one call. Opens both files, sizes the source via
+  `io_size`, `ftruncate`s the destination, mmaps both
+  (source `PROT_READ MAP_PRIVATE`, destination
+  `PROT_READ|PROT_WRITE MAP_SHARED`), `rep movsb`s the
+  bytes across, unmaps and closes. Returns `0` on success,
+  negative errno on failure. Zero-length sources
+  short-circuit past the mmap dance (Linux `mmap(len=0)`
+  is `-EINVAL`). No libstr or libsock coupling — `close`
+  is inlined via raw syscall the same way
+  `dir_iter_close` does.
 
 Future helpers that compose a common file-I/O pattern into
 one call belong here rather than in `syscall/`.
