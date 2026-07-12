@@ -6,6 +6,7 @@ ARCHIVE := lib$(NAME).a
 # libs/asm/ does. `asm/` predates libstr; the layouts converge.
 SRCS    := memcpy.asm memset.asm memcmp.asm memchr.asm \
            strlen.asm strcmp.asm strncmp.asm strchr.asm strcpy.asm \
+           strcasecmp.asm strncasecmp.asm \
            atoi.asm itoa.asm
 OBJS    := $(SRCS:.asm=.o)
 

@@ -16,6 +16,15 @@ follows.
 
 ## Version
 
+**v1.3** — case-insensitive compare: `strcasecmp` and
+`strncasecmp`. ASCII-only fold: bytes in `A`–`Z` map to
+`a`–`z` on the fly before comparison; every other byte
+(digits, punctuation, whitespace, the high half) is compared
+as-is. Motivated by HTTP header-name matching (RFC 9110
+§5.1 makes field names case-insensitive), but the routines
+carry no HTTP knowledge — they are the same primitive C
+`<strings.h>` ships.
+
 **v1.2** — decimal integer conversion: `atoi` (string → i64)
 and `itoa` (i64 → digit run). `atoi` skips leading
 whitespace and handles the optional sign, matching C's
@@ -56,6 +65,8 @@ shape do not need a translation table.
 | `strncmp` | `rdi = a`, `rsi = b`, `rdx = n`              | Like `strcmp` but stops after `n` bytes or the first shared terminator.            |
 | `strchr`  | `rdi = s` (NUL-terminated), `rsi = c` (byte) | Pointer to the first byte equal to `c`, or NULL. `c = 0` matches the terminator.   |
 | `strcpy`  | `rdi = dst`, `rsi = src` (NUL-terminated)    | `rdi` (the original `dst`). Copies through and including the terminator.           |
+| `strcasecmp`  | `rdi = a`, `rsi = b` (both NUL-terminated) | Like `strcmp` with `A`–`Z` folded to `a`–`z` on the fly. ASCII only.           |
+| `strncasecmp` | `rdi = a`, `rsi = b`, `rdx = n`        | Like `strncmp` with the same ASCII fold. `n = 0` returns 0 without reading.      |
 | `atoi`    | `rdi = s` (NUL-terminated)                   | Parsed signed 64-bit integer in `rax`. Returns 0 on "no digits" input.             |
 | `itoa`    | `rdi = n` (signed i64), `rsi = buf`          | Bytes written into `buf` in `rax`. No trailing NUL; max output is 20 bytes.        |
 

@@ -59,6 +59,7 @@ default rel
 extern memcpy, memset, memcmp, memchr
 extern strlen, strcmp, strncmp, strchr, strcpy
 extern atoi, itoa                   ; libstr v1.2
+extern strcasecmp, strncasecmp      ; libstr v1.3
 extern panic                        ; libasm
 
 global _start
@@ -89,6 +90,18 @@ atoi_big:     db "+2147483648", 0   ; larger than INT32_MAX, still in i64
 atoi_42:      db "42", 0
 llong_min_ref: db "-9223372036854775808"
 llong_min_ref_len: equ $ - llong_min_ref
+
+; v1.3 fixtures — case-insensitive compare.
+ct_upper:     db "Content-Type", 0  ; canonical HTTP header spelling
+ct_lower:     db "content-type", 0  ; lowercased alias
+msg_HELLO:    db "HELLO", 0         ; uppercase form of msg_hello
+msg_hellO:    db "hellO", 0         ; mixed case
+msg_lbrack:   db "[", 0             ; 0x5B — one below 'a' after fold
+msg_lbrace:   db "{", 0             ; 0x7B — '[' | 0x20; the naive-fold trap
+msg_abZ_ci:   db "abZ", 0           ; folds to "abz"; sub-check g
+hello_xorld:  db "HELLO XORLD!", 0  ; differs from "hello world" at i=6
+hello_world:  db "hello world!", 0
+msg_world:    db "world", 0
 
 ; 12-byte reference for memcmp equality check
 ref_hi:     db "HELLO WORLD!"
@@ -541,6 +554,79 @@ _main:
     call atoi
     cmp rax, 123456789
     jne .fail
+
+    ; ---- v1.3: case-insensitive compare ----
+    ; e: strcasecmp("Content-Type", "content-type") → 0
+    ;    The canonical HTTP header-name test: uppercase and
+    ;    lowercase spellings must compare equal.
+    mov byte [fail_id], 'e'
+    lea rdi, [ct_upper]
+    lea rsi, [ct_lower]
+    call strcasecmp
+    test rax, rax
+    jnz .fail
+
+    ; f: strcasecmp("HELLO", "hellO") → 0
+    ;    Mixed-case; every fold combination has to converge on
+    ;    the same lowercase form.
+    mov byte [fail_id], 'f'
+    lea rdi, [msg_HELLO]
+    lea rsi, [msg_hellO]
+    call strcasecmp
+    test rax, rax
+    jnz .fail
+
+    ; g: strcasecmp("abZ", "abc") → positive
+    ;    Z folds to z (0x7A); z > c (0x63) → positive result.
+    mov byte [fail_id], 'g'
+    lea rdi, [msg_abZ_ci]
+    lea rsi, [msg_abc]
+    call strcasecmp
+    test rax, rax
+    jle .fail                       ; must be > 0
+
+    ; h: strcasecmp("[", "{") → negative
+    ;    '[' is 0x5B, '{' is 0x7B — the naive `c | 0x20` fold
+    ;    would turn '[' into '{' and report equal. Proper range
+    ;    check leaves both alone; 0x5B < 0x7B → negative.
+    mov byte [fail_id], 'h'
+    lea rdi, [msg_lbrack]
+    lea rsi, [msg_lbrace]
+    call strcasecmp
+    test rax, rax
+    jns .fail                       ; must be < 0
+
+    ; i: strncasecmp("HELLO XORLD!", "hello world!", 6) → 0
+    ;    The two differ at index 6 ('X' vs 'w'); the bound
+    ;    stops before that, and the first 6 folded bytes
+    ;    ("hello ") match.
+    mov byte [fail_id], 'i'
+    lea rdi, [hello_xorld]
+    lea rsi, [hello_world]
+    mov rdx, 6
+    call strncasecmp
+    test rax, rax
+    jnz .fail
+
+    ; j: strncasecmp("HELLO", "world", 0) → 0
+    ;    n = 0 must return 0 without reading either pointer.
+    mov byte [fail_id], 'j'
+    lea rdi, [msg_HELLO]
+    lea rsi, [msg_world]
+    xor rdx, rdx
+    call strncasecmp
+    test rax, rax
+    jnz .fail
+
+    ; k: strncasecmp("HELLO", "world", 5) → negative
+    ;    Folded 'h' (0x68) < 'w' (0x77) at index 0.
+    mov byte [fail_id], 'k'
+    lea rdi, [msg_HELLO]
+    lea rsi, [msg_world]
+    mov rdx, 5
+    call strncasecmp
+    test rax, rax
+    jns .fail
 
     ; PASS
     mov rax, SYS_write
