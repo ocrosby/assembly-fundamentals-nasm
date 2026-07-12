@@ -13,6 +13,19 @@ follows.
 
 ## Version
 
+**v1.4** — `sigsuspend` syscall wrapper. Blocks until a
+signal not in `*mask` is delivered; the handler runs and
+the wrapper returns `-EINTR`. Callers use it to atomically
+unblock a signal and wait for it — the sigprocmask +
+wait pattern alone has a race window. The wrapper
+normalizes a nasty platform asymmetry internally: macOS
+BSD sigsuspend takes the sigset_t **by value** in `edi`;
+Linux `rt_sigsuspend` takes a **pointer** in `rdi` plus
+`sigsetsize` in `rsi`. Callers pass a pointer either way.
+The smoke's sub-check M exercises the full round-trip on
+Linux; macOS skips M for the same reason it skips I..L
+(custom-handler support required).
+
 **v1.3** — custom-handler support on **Linux**. Ships
 `sig_restorer`, the SA_RESTORER trampoline that invokes
 `SYS_rt_sigreturn` when a handler returns; without it, the
@@ -62,6 +75,7 @@ SA_RESTORER trampoline work — see "Not here yet" below.
 | `sigprocmask` | `how`, `set*`, `oldset*`                     | 0 or negative errno                  |
 | `sigpending`  | `set*`                                       | 0 or negative errno                  |
 | `sigaction`   | `signum`, `act*`, `oldact*`                  | 0 or negative errno *(v1.2)*         |
+| `sigsuspend`  | `mask*`                                      | `-EINTR` after a handler runs; other negative errno on failure *(v1.4)* |
 
 ### `util/` — pure-computation sigset helpers *(v1.1)*
 
@@ -235,12 +249,6 @@ $(BIN): $(OBJ) $(LIBSIG)
   offset out of the xnu source is on the road map but not
   in this release. Until it lands, macOS callers stick
   with v1.2's SIG_DFL / SIG_IGN dispositions.
-- **`sigsuspend`.** Blocks until a signal not in the given
-  mask is delivered, then returns `-EINTR`. Small syscall,
-  but callers usually want custom handlers first (there is
-  no point suspending for signals whose disposition is
-  SIG_DFL — that just terminates the process), so it ships
-  alongside the v1.3 handler support.
 - **`sigfillset`.** Trivial (a full-1s fill of the sigset
   buffer) but only meaningful once real handlers are
   installable via `sigaction` — the existing `sig_zero` +

@@ -67,6 +67,16 @@
 ;   K  Verify handler_flag was set to 1 during delivery.
 ;   L  sigaction(SIGPIPE, {sa_handler = SIG_DFL}, NULL) → 0.
 ;      Restore default disposition for hygiene.
+;   M  **Linux only**. Block SIGPIPE, queue it via raw write
+;      to a broken pipe (the signal is pending because
+;      blocked), then sigsuspend(&empty_mask). The
+;      temporarily-empty mask lets SIGPIPE fire; the handler
+;      installed in sub-check I runs; sigsuspend returns
+;      -EINTR (POSIX contract: sigsuspend returns only after
+;      a handler function runs). This sub-check needs the
+;      handler to be present, so it runs *before* the L
+;      restore. macOS skips M for the same reason it skips
+;      I..L: custom-handler support is deferred.
 
 %include "syscall.inc"
 
@@ -84,7 +94,7 @@
 
 default rel
 
-extern sigprocmask, sigpending, sigaction
+extern sigprocmask, sigpending, sigaction, sigsuspend
 extern sig_zero, sig_add, sig_del, sig_test
 %ifndef MACOS
 extern sig_restorer                 ; libsig v1.3 Linux SA_RESTORER trampoline
@@ -474,6 +484,45 @@ _main:
 
     ; ---- K: handler_flag == 1 ----
     mov byte [fail_id], 'K'
+    cmp byte [handler_flag], 1
+    jne .fail
+
+    ; ---- M: sigsuspend delivers the queued handler ----
+    ; Block SIGPIPE, queue it via write to the still-broken
+    ; pipe (kernel holds it pending because blocked), then
+    ; sigsuspend with an empty mask temporarily unblocks
+    ; SIGPIPE. The custom handler installed in I runs;
+    ; sigsuspend returns -EINTR per POSIX.
+    mov byte [fail_id], 'M'
+    mov byte [handler_flag], 0
+
+    ; Block SIGPIPE. set_pipe already holds bit (SIGPIPE-1).
+    mov edi, SIG_BLOCK
+    lea rsi, [set_pipe]
+    xor edx, edx
+    call sigprocmask
+    test rax, rax
+    jnz .fail
+
+    ; write to broken pipe → -EPIPE, SIGPIPE queued.
+    mov edi, [pipefd2 + 4]
+    lea rsi, [sig_buf]
+    mov edx, 1
+    mov rax, SYS_write
+    syscall
+
+    ; Prepare empty mask via sig_zero (util_buf may still
+    ; carry state from the earlier sub-checks).
+    lea rdi, [util_buf]
+    call sig_zero
+
+    ; sigsuspend(&empty_mask). Returns -EINTR after the
+    ; handler runs.
+    lea rdi, [util_buf]
+    call sigsuspend
+    ; EINTR = 4 on both platforms; wrapper returns -EINTR.
+    cmp rax, -4
+    jne .fail
     cmp byte [handler_flag], 1
     jne .fail
 
