@@ -45,6 +45,10 @@ A progressive walkthrough of x86-64 assembly with NASM. Each guide is intentiona
 - [Memory Mapping](26-memory-mapping.md) — `mmap` + `munmap` and the
   three useful flag combinations: anonymous private scratch,
   file-backed private view, and `MAP_SHARED` for IPC across `fork`.
+- [Static Libraries](27-libraries.md) — the eight reusable NASM
+  archives under `libs/` that later examples opt into: what they
+  cover, the shared calling and error convention, the dependency
+  graph, and how to link.
 
 ## Appendix
 
