@@ -54,6 +54,7 @@ vocabulary needed for the early chapters of [../docs/](../docs/).
 | 43 | [43-file-server](43-file-server/)                    | `file_copy_stream` sends a file over TCP; libsock + libio + libproc in one flow | —                                             |
 | 44 | [44-dns-lookup](44-dns-lookup/)                      | first libresolv user — look "localhost" up in `/etc/hosts`, verify `127.0.0.1` | —                                             |
 | 45 | [45-dir-iter](45-dir-iter/)                          | `dir_iter_*` walk — seed a scratch dir, count `DT_REG` entries        | —                                             |
+| 46 | [46-nonblock](46-nonblock/)                          | first `fcntl` user — set `O_NONBLOCK`, empty read returns `-EAGAIN`  | —                                             |
 
 Examples 1 and 2 do not have a dedicated chapter — they are the
 smallest possible programs and exist so that every later example can
