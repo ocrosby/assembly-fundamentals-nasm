@@ -34,6 +34,7 @@ default rel
 
 extern readv, writev, pipe
 extern panic                        ; libasm v1.1
+extern memcmp                       ; libstr v1.0
 
 global _start
 global _main
@@ -47,18 +48,18 @@ part_c:  db "RLD!"
 pass_msg: db "PASS", 10
 pass_len: equ $ - pass_msg
 
-; Expected values for sub-checks 4 and 5. writev concatenates
-; part_a + part_b + part_c = "HELLO WORLD!" as a stream. readv
-; splits it across two 6-byte iovecs, so:
+; Expected receive buffers for sub-checks 4 and 5. writev
+; concatenates part_a + part_b + part_c = "HELLO WORLD!" as a
+; stream. readv splits it across two 6-byte iovecs, so:
 ;   buf_in_a = "HELLO "   (bytes 0..5)
 ;   buf_in_b = "WORLD!"   (bytes 6..11)
 ;
-; Compared as u16 pairs (low u16 + high u16 of a 6-byte string
-; requires care; use a 4-byte dword + a 2-byte word instead).
-expected_a_dw: dd 0x4C4C4548        ; "HELL" as LE u32
-expected_a_w:  dw 0x204F              ; "O " as LE u16
-expected_b_dw: dd 0x4C524F57        ; "WORL" as LE u32
-expected_b_w:  dw 0x2144              ; "D!" as LE u16
+; libstr's memcmp does the byte compare in one call. The prior
+; version split each 6-byte compare into a dword + a word to
+; avoid a byte loop; memcmp makes that mechanical split
+; unnecessary and lets the intent read directly.
+expected_a: db "HELLO "             ; 6 bytes, no NUL
+expected_b: db "WORLD!"             ; 6 bytes, no NUL
 
 section .data
 fail_msg: db "FAIL:?", 10
@@ -125,21 +126,21 @@ _main:
 
     ; ---- 4: buf_in_a == "HELLO " ----
     mov byte [fail_id], '4'
-    mov eax, [expected_a_dw]
-    cmp eax, dword [buf_in_a]
-    jne .fail
-    mov ax, [expected_a_w]
-    cmp ax, word [buf_in_a + 4]
-    jne .fail
+    lea rdi, [buf_in_a]
+    lea rsi, [expected_a]
+    mov edx, 6
+    call memcmp
+    test rax, rax
+    jnz .fail
 
     ; ---- 5: buf_in_b == "WORLD!" ----
     mov byte [fail_id], '5'
-    mov eax, [expected_b_dw]
-    cmp eax, dword [buf_in_b]
-    jne .fail
-    mov ax, [expected_b_w]
-    cmp ax, word [buf_in_b + 4]
-    jne .fail
+    lea rdi, [buf_in_b]
+    lea rsi, [expected_b]
+    mov edx, 6
+    call memcmp
+    test rax, rax
+    jnz .fail
 
     ; PASS
     mov rax, SYS_write
