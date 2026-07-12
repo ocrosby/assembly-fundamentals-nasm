@@ -149,3 +149,7 @@ jobs:
       - name: Build and smoke-test the process library
         shell: bash
         run: make -C libs/proc test
+
+      - name: Build and smoke-test the string library
+        shell: bash
+        run: make -C libs/str test

@@ -31,6 +31,7 @@ All archives in this directory share the same conventions:
 | [`resolv/`](resolv/) | `libresolv.a` | DNS A-record resolver over UDP. Wire encode / decode plus a `resolv_a(name, resolver, port, out_ip)` entry point built on `libsock`, a `resolv_sockaddr` composed helper that returns a filled `struct sockaddr_in`, and a `resolv_dial` composed helper that returns a connected fd. |
 | [`time/`](time/)  | `libtime.a` | Wall-clock and CPU-time primitives from `<sys/time.h>` / `<sys/resource.h>` — `gettimeofday`, `sleep_ms`, `getrusage`, plus `time_diff_us`, `now_ms`, and `monotonic_ms` util helpers. `monotonic_ms` is deliberately asymmetric: Linux uses `clock_gettime(CLOCK_MONOTONIC, ...)`, macOS returns `-ENOSYS`. |
 | [`proc/`](proc/)  | `libproc.a` | Process control from `<unistd.h>` / `<sys/wait.h>` / `<signal.h>` — `fork`, `execve`, `wait4`, `getpid`, `getppid`, `kill`, plus a `spawn_wait` composed helper. |
+| [`str/`](str/)    | `libstr.a`  | Byte-manipulation helpers (`memcpy`, `memset`, `memcmp`, `strlen`, `strcmp`). Pure computation — no syscalls, no per-platform paths. |
 
 Each subdirectory's `README.md` documents the exported symbols and
 calling conventions for that archive.
@@ -46,6 +47,7 @@ make -C libs/io
 make -C libs/resolv
 make -C libs/time
 make -C libs/proc
+make -C libs/str
 ```
 
 There is no aggregate `libs/Makefile` yet — each archive has its own
