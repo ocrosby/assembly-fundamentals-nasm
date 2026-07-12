@@ -109,6 +109,7 @@ jobs:
             [44-dns-lookup]=42
             [45-dir-iter]=42
             [46-nonblock]=42
+            [47-timing]=42
           )
           # Examples that read from stdin get an empty pipe so they hit
           # EOF immediately and exit 0 without waiting for a TTY.
