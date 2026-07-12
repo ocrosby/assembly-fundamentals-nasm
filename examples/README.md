@@ -57,6 +57,7 @@ vocabulary needed for the early chapters of [../docs/](../docs/).
 | 46 | [46-nonblock](46-nonblock/)                          | first `fcntl` user — set `O_NONBLOCK`, empty read returns `-EAGAIN`  | —                                             |
 | 47 | [47-timing](47-timing/)                              | first libtime user as star — `now_ms` bracket around `sleep_ms(50)`  | —                                             |
 | 48 | [48-flock](48-flock/)                                | `flock` as filesystem mutex — parent holds, child's `LOCK_NB` sees `-EWOULDBLOCK` | —                                             |
+| 49 | [49-poll](49-poll/)                                  | first `poll` user — one pipe, one struct pollfd, timeout then `POLLIN` ready | —                                             |
 
 Examples 1 and 2 do not have a dedicated chapter — they are the
 smallest possible programs and exist so that every later example can
