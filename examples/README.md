@@ -46,6 +46,7 @@ vocabulary needed for the early chapters of [../docs/](../docs/).
 | 35 | [35-mmap-copy](35-mmap-copy/)                        | two live mmaps — file→file copy in userspace, no read/write for the transfer | —                                             |
 | 36 | [36-file-copy](36-file-copy/)                        | `file_copy` composed helper — 35 shows how, 36 shows use            | —                                             |
 | 37 | [37-config-load](37-config-load/)                    | libio + libstr on the same buffer — `file_read_all` + `strchr` + `memcmp` | —                                             |
+| 38 | [38-signal-block](38-signal-block/)                  | first libsig user — block SIGPIPE, write to a broken pipe, observe pending | —                                             |
 
 Examples 1 and 2 do not have a dedicated chapter — they are the
 smallest possible programs and exist so that every later example can
