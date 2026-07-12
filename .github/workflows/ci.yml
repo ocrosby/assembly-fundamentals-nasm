@@ -105,6 +105,7 @@ jobs:
             [40-fork-signal]=42
             [41-logger]=42
             [42-signal-handler]=42
+            [43-file-server]=42
           )
           # Examples that read from stdin get an empty pipe so they hit
           # EOF immediately and exit 0 without waiting for a TTY.
