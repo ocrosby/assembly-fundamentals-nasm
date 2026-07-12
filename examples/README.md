@@ -56,6 +56,7 @@ vocabulary needed for the early chapters of [../docs/](../docs/).
 | 45 | [45-dir-iter](45-dir-iter/)                          | `dir_iter_*` walk — seed a scratch dir, count `DT_REG` entries        | —                                             |
 | 46 | [46-nonblock](46-nonblock/)                          | first `fcntl` user — set `O_NONBLOCK`, empty read returns `-EAGAIN`  | —                                             |
 | 47 | [47-timing](47-timing/)                              | first libtime user as star — `now_ms` bracket around `sleep_ms(50)`  | —                                             |
+| 48 | [48-flock](48-flock/)                                | `flock` as filesystem mutex — parent holds, child's `LOCK_NB` sees `-EWOULDBLOCK` | —                                             |
 
 Examples 1 and 2 do not have a dedicated chapter — they are the
 smallest possible programs and exist so that every later example can
