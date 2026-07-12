@@ -1,7 +1,7 @@
 ; Parse a KEY=VALUE line out of a config file using libio's
-; `file_read_all` to load the file and libstr's `strchr` +
-; `memcmp` to walk the buffer. Exits with the parsed value on
-; success (42); exits 1 on any error.
+; `file_read_all` to load the file and libstr's `strchr`,
+; `memcmp`, and `atoi` to walk the buffer. Exits with the
+; parsed value on success (42); exits 1 on any error.
 ;
 ; This example is the first that uses two libraries together
 ; on the same buffer — libio hands the caller a PROT_READ view
@@ -21,7 +21,7 @@
 ;   memcmp(addr, "ANSWER", 6)                → 0 (matches key)
 ;   strchr(addr, '=')                        → pointer to '='
 ;   Verify '=' sits at addr+6 (nothing between key and '=')
-;   Read two digits after '=', decode as decimal
+;   atoi(value_ptr)                          → parsed integer
 ;   munmap(addr, size)
 ;   exit(value)
 
@@ -44,7 +44,7 @@
 default rel
 
 extern open, munmap, file_read_all
-extern memcmp, strchr
+extern memcmp, strchr, atoi
 
 global _start
 global _main
@@ -126,22 +126,16 @@ _main:
     cmp rax, rcx
     jne .fail
 
-    ; ---- Decode two ASCII digits into a byte ----
-    ; Value starts one byte after the '=' pointer. Read each
-    ; digit, subtract '0', combine as (d1 * 10 + d2).
+    ; ---- atoi on the value ----
+    ; Value starts one byte after the '=' pointer. libstr's
+    ; atoi walks digits until the first non-digit (in this
+    ; fixture, the trailing NUL or whatever byte the mmap
+    ; landed on past the file's end) and returns the parsed
+    ; integer. r13 preserves it across the munmap.
     inc rax                             ; skip past '='
-    movzx ecx, byte [rax]               ; d1
-    sub ecx, '0'
-    cmp ecx, 9
-    ja .fail                            ; not a digit
-    movzx edx, byte [rax + 1]           ; d2
-    sub edx, '0'
-    cmp edx, 9
-    ja .fail
-    ; result = d1 * 10 + d2
-    imul ecx, ecx, 10
-    add ecx, edx
-    mov r13d, ecx                       ; save value across munmap
+    mov rdi, rax
+    call atoi
+    mov r13, rax                        ; save value across munmap
 
     ; ---- munmap(addr, size) — caller-owned cleanup ----
     mov rdi, r12

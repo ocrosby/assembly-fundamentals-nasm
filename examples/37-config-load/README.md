@@ -1,8 +1,9 @@
 # 37 — config-load
 
 Parse a `KEY=VALUE` line out of a config file using libio's
-`file_read_all` to load the file and libstr's `strchr` +
-`memcmp` to walk the buffer. Exits 42 on success.
+`file_read_all` to load the file and libstr's `memcmp`,
+`strchr`, and `atoi` to walk the buffer and decode the
+value. Exits 42 on success.
 
 First example to use two archives on the same buffer: libio
 hands the caller a `PROT_READ` view of the whole file, and
@@ -17,9 +18,10 @@ libstr walks it byte-by-byte.
 - **Two archives, one buffer.** libio owns the bytes;
   libstr walks them. Callers link both archives; the two
   don't know about each other and don't need to.
-- **`memcmp` + `strchr` composition.** The classic
-  "does this start with X? then find the separator" pattern
-  that shows up in every configuration parser.
+- **`memcmp` + `strchr` + `atoi` composition.** The classic
+  "does this start with X? then find the separator; then
+  parse the value" pattern that shows up in every
+  configuration parser.
 
 ## Config format
 
@@ -41,14 +43,15 @@ file_read_all(path, &addr, &size)  → PROT_READ view
 memcmp(addr, "ANSWER", 6)          → 0 (key matches)
 strchr(addr, '=')                  → pointer to '='
 Reject anything with '=' not at addr+6 (no spaces)
-Decode two digits after '=' as decimal
+atoi(value_ptr)                    → parsed integer
 munmap(addr, size)                 → caller-owned cleanup
 exit(value)                        → 42
 ```
 
-The two-digit decode keeps the example small — a real
-config parser would run an atoi loop, but atoi is not the
-concept this example is here to teach.
+`atoi` stops at the first non-digit (the trailing NUL or
+LF that follows the digits in the fixture), so the example
+does not have to know how long the value is up front. A
+real config parser would run the same call.
 
 ## Build and run
 
