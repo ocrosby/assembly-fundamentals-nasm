@@ -36,10 +36,13 @@ esac
 # libresolv depends on libsock (socket / sendto / recvfrom /
 # setsockopt / close / inet_pton4) and, from v1.1 onwards, on
 # libio (open / pread) for the /etc/hosts and /etc/resolv.conf
-# parsers. List libresolv first so static-archive resolution
-# pulls its objects in to satisfy each undefined reference
-# before libsock / libio get considered.
-libs=(../libresolv.a ../../sock/libsock.a ../../io/libio.a)
+# parsers. libasm's `panic` is on the line for every smoke's
+# .fail path; inert on happy paths since the linker only pulls
+# in objects for unresolved symbols. List libresolv first so
+# static-archive resolution pulls its objects in to satisfy
+# each undefined reference before libsock / libio get
+# considered.
+libs=(../libresolv.a ../../sock/libsock.a ../../io/libio.a ../../asm/libasm.a)
 
 tmp="$(mktemp -d)"
 srv=""
@@ -354,7 +357,7 @@ fi
 # ---------------------------------------------------------------
 # shellcheck disable=SC2086
 nasm $nasm_fmt -I ../.. fail-smoke.asm -o fail-smoke.o
-"${ld_cmd[@]}" fail-smoke.o ../libresolv.a -o fail-smoke
+"${ld_cmd[@]}" fail-smoke.o ../libresolv.a ../../asm/libasm.a -o fail-smoke
 
 set +e
 f_out="$(./fail-smoke 2>&1)"
