@@ -4,7 +4,8 @@ ARCHIVE := lib$(NAME).a
 # libstr is pure computation — no syscalls, no OS-specific paths.
 # Everything sits in the top level of libs/str/ the same way
 # libs/asm/ does. `asm/` predates libstr; the layouts converge.
-SRCS    := memcpy.asm memset.asm memcmp.asm strlen.asm strcmp.asm
+SRCS    := memcpy.asm memset.asm memcmp.asm memchr.asm \
+           strlen.asm strcmp.asm strncmp.asm strchr.asm strcpy.asm
 OBJS    := $(SRCS:.asm=.o)
 
 UNAME_S := $(shell uname -s)

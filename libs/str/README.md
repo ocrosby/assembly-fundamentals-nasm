@@ -1,8 +1,10 @@
 # libs/str/
 
 Byte-manipulation helpers packaged as the static archive
-`libstr.a`. Five routines: `memcpy`, `memset`, `memcmp`,
-`strlen`, and `strcmp`. Every export is pure computation — no
+`libstr.a`. Nine routines cover the raw-byte pair
+(`memcpy` / `memset` / `memcmp` / `memchr`) and the
+NUL-terminated-string set (`strlen` / `strcmp` / `strncmp` /
+`strchr` / `strcpy`). Every export is pure computation — no
 syscalls, no OS-specific branches, no `%ifdef MACOS` — so the
 source has no per-platform paths and the archive builds
 identically on macOS and Linux.
@@ -13,38 +15,55 @@ follows.
 
 ## Version
 
+**v1.1** — four search / bounded-compare / copy routines
+extend the archive: `memchr`, `strchr`, `strncmp`, and
+`strcpy`. Each matches its C standard-library counterpart
+so callers who already know the C shape need no translation
+table. `strncmp` fills the "bounded strcmp" hole that came
+up as soon as v1.0 shipped; `memchr` and `strchr` cover the
+"find first byte" pattern; `strcpy` writes a NUL-terminated
+run into a caller-owned buffer. No `strncpy` — its truncation
+semantics are famously confusing; callers wanting a bounded
+copy compute `strlen` and call `memcpy` explicitly.
+
 **v1.0** — first shipping cut of libstr. Five routines cover
 the byte-manipulation surface that consumer code was inlining
-by hand: the raw-byte pair (`memcpy`, `memset`, `memcmp`) and
-the NUL-terminated-string pair (`strlen`, `strcmp`). Every
-routine returns per the C standard so callers who already know
-the C shape do not need a translation table.
+by hand: the raw-byte trio (`memcpy`, `memset`, `memcmp`) and
+the NUL-terminated pair (`strlen`, `strcmp`). Every routine
+returns per the C standard so callers who already know the C
+shape do not need a translation table.
 
 ## Exported symbols
 
-| Symbol   | Arguments                                    | Returns                                                                 |
-| -------- | -------------------------------------------- | ----------------------------------------------------------------------- |
-| `memcpy` | `rdi = dst`, `rsi = src`, `rdx = n`          | `rdi` (the original `dst`).                                             |
-| `memset` | `rdi = dst`, `rsi = c` (byte), `rdx = n`     | `rdi` (the original `dst`). Only the low byte of `c` is written.        |
-| `memcmp` | `rdi = a`, `rsi = b`, `rdx = n`              | 0 if equal, positive if `a > b`, negative if `a < b` (unsigned bytes).  |
-| `strlen` | `rdi = s` (NUL-terminated)                   | Length in bytes, excluding the terminator.                              |
-| `strcmp` | `rdi = a`, `rsi = b` (both NUL-terminated)   | 0 if equal, positive if `a > b`, negative if `a < b` (unsigned bytes).  |
+| Symbol    | Arguments                                    | Returns                                                                            |
+| --------- | -------------------------------------------- | ---------------------------------------------------------------------------------- |
+| `memcpy`  | `rdi = dst`, `rsi = src`, `rdx = n`          | `rdi` (the original `dst`).                                                        |
+| `memset`  | `rdi = dst`, `rsi = c` (byte), `rdx = n`     | `rdi` (the original `dst`). Only the low byte of `c` is written.                   |
+| `memcmp`  | `rdi = a`, `rsi = b`, `rdx = n`              | 0 if equal, positive if `a > b`, negative if `a < b` (unsigned bytes).             |
+| `memchr`  | `rdi = s`, `rsi = c` (byte), `rdx = n`       | Pointer to the first byte equal to `c` in the first `n` bytes, or NULL on miss.    |
+| `strlen`  | `rdi = s` (NUL-terminated)                   | Length in bytes, excluding the terminator.                                         |
+| `strcmp`  | `rdi = a`, `rsi = b` (both NUL-terminated)   | 0 if equal, positive if `a > b`, negative if `a < b` (unsigned bytes).             |
+| `strncmp` | `rdi = a`, `rsi = b`, `rdx = n`              | Like `strcmp` but stops after `n` bytes or the first shared terminator.            |
+| `strchr`  | `rdi = s` (NUL-terminated), `rsi = c` (byte) | Pointer to the first byte equal to `c`, or NULL. `c = 0` matches the terminator.   |
+| `strcpy`  | `rdi = dst`, `rsi = src` (NUL-terminated)    | `rdi` (the original `dst`). Copies through and including the terminator.           |
 
-`memcpy` and `memset` return the original `dst` pointer for
-call-chaining. `memcmp` and `strcmp` return a signed 64-bit
-integer in `rax` — the value always fits in `[-255, 255]`, so
-callers wanting the traditional C `int` can truncate the low
-32 bits.
+`memcpy`, `memset`, and `strcpy` return the original `dst`
+pointer for call-chaining. `memcmp` and `strcmp` / `strncmp`
+return a signed 64-bit integer in `rax` — the value always
+fits in `[-255, 255]`, so callers wanting the traditional C
+`int` can truncate the low 32 bits. `memchr` and `strchr`
+return either a pointer into the input string or NULL (0).
 
-Byte-at-a-time is deliberate for `memcmp`, `strlen`, and
-`strcmp`. A SIMD or SWAR scan can read past the end of the
-input buffer when the boundary is not aligned; that trick is
-legal in glibc (malloc always overallocs) but this archive
-makes no allocation assumption about its callers. `memcpy` and
-`memset` use `rep movsb` / `rep stosb`, which the modern x86-64
-core turns into a fast-string microcoded copy — competitive with
-hand-rolled 8-byte loops at the small buffer sizes this
-library targets, and honest about not touching bytes past `n`.
+Byte-at-a-time is deliberate for the compare, scan, and
+NUL-terminated routines. A SIMD or SWAR scan can read past
+the end of the input buffer when the boundary is not
+aligned; that trick is legal in glibc (malloc always
+overallocs) but this archive makes no allocation assumption
+about its callers. `memcpy` and `memset` use `rep movsb` /
+`rep stosb`, which the modern x86-64 core turns into a
+fast-string microcoded copy — competitive with hand-rolled
+8-byte loops at the small buffer sizes this library targets,
+and honest about not touching bytes past `n`.
 
 Symbols are exported under their plain names (`memcpy`, not
 `_memcpy`) on both platforms. The archive is meant for
@@ -55,9 +74,9 @@ it must use an `__asm__("memcpy")` label to bypass Mach-O's
 
 ## Overlap and n = 0
 
-- `memcpy`: buffers must not overlap. Overlap is undefined
-  behavior; there is no `memmove` in this archive.
-- `memset`, `memcmp`: no overlap constraint.
+- `memcpy`, `strcpy`: buffers must not overlap. Overlap is
+  undefined behavior; there is no `memmove` in this archive.
+- `memset`, `memcmp`, `memchr`: no overlap constraint.
 - Every routine treats `n = 0` as legal and returns without
   touching memory (`memcpy` / `memset` return `dst`;
   `memcmp` returns 0).
@@ -71,7 +90,7 @@ make -C libs/str
 ```
 
 The Makefile detects Darwin via `uname -s` and assembles with
-`nasm -f macho64 -DMACOS`, then packs the five object files into
+`nasm -f macho64 -DMACOS`, then packs the object files into
 `libstr.a` with `ar rcs`. `-DMACOS` is inert for libstr's
 sources — none of them branch on the flag — but it keeps the
 build flags uniform across every archive in `libs/`.
@@ -101,10 +120,15 @@ in [`test/run.sh`](test/run.sh):
   (unsigned), and `n = 0` inputs; B–D verify `strlen` at length
   0, 5, and 13; E–H verify `strcmp` for equal, `<`, `>`
   (shorter side smaller), and `>` (byte value greater).
+  **v1.1** adds I–K (`memchr` hit / miss / `n = 0`), L–N
+  (`strchr` hit / needle == '\0' / miss), O–S (`strncmp`
+  equal-in-n / differ-in-n / bounded-below-diff / shorter-<-longer
+  / `n = 0`), and T–U (`strcpy` copies + preserves trailing
+  sentinels / returns dst).
 
 libasm's `panic` is on the link line because the smoke's
 `.fail` path calls into it. Sub-check IDs are single characters
-so a failure prints one of `FAIL:1` through `FAIL:H` on stderr
+so a failure prints one of `FAIL:1` through `FAIL:U` on stderr
 and the process exits 1.
 
 ## Linking against `libstr.a` from an example

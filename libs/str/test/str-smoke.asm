@@ -23,6 +23,19 @@
 ;   F  strcmp: "abc" < "abd" returns negative
 ;   G  strcmp: "abcd" > "abc" returns positive (shorter side is less)
 ;   H  strcmp: "abc" > "abZ" returns positive (Z = 0x5A < c = 0x63)
+;   I  memchr: finds 'W' at index 6 of "HELLO WORLD!"
+;   J  memchr: miss on n-bounded scan returns NULL
+;   K  memchr: n = 0 returns NULL
+;   L  strchr: finds 'o' at index 4 of "hello"
+;   M  strchr: needle = '\0' returns pointer to the terminator
+;   N  strchr: miss returns NULL
+;   O  strncmp: equal in first n bytes returns 0 (differ after n)
+;   P  strncmp: first differing byte within n returns nonzero
+;   Q  strncmp: differing byte at index n is not compared (returns 0)
+;   R  strncmp: shorter string is less when the shorter side hits NUL first
+;   S  strncmp: n = 0 returns 0
+;   T  strcpy: copies "hello" and its terminator into a fresh buffer
+;   U  strcpy: returns the original dst pointer
 
 %ifdef MACOS
 %define SYS_write 0x2000004
@@ -34,8 +47,8 @@
 
 default rel
 
-extern memcpy, memset, memcmp, strlen, strcmp
-extern panic                        ; libasm
+extern memcpy, memset, memcmp, memchr
+extern strlen, strcmp, strncmp, strchr, strcpy
 extern panic                        ; libasm
 
 global _start
@@ -53,6 +66,12 @@ msg_abc:    db "abc", 0
 msg_abd:    db "abd", 0
 msg_abcd:   db "abcd", 0
 msg_abZ:    db "abZ", 0             ; 'Z' (0x5A) < 'c' (0x63)
+
+; v1.1 fixtures.
+msg_ab:     db "ab", 0              ; shorter prefix of "abc"
+msg_hello3: db "hello", 0           ; distinct copy for strchr misses
+msg_abcXX:  db "abcXX", 0           ; strncmp bounded-equality target A
+msg_abcYY:  db "abcYY", 0           ; strncmp bounded-equality target B
 
 ; 12-byte reference for memcmp equality check
 ref_hi:     db "HELLO WORLD!"
@@ -74,6 +93,7 @@ dst12:      resb 16                 ; extra slack detects overrun
 dst_zero:   resb 4                  ; canary buffer for n=0 checks
 buf16:      resb 16
 buf_zero:   resb 4                  ; canary for memset n=0
+buf_cpy:    resb 8                  ; strcpy destination (v1.1)
 
 section .text
 
@@ -259,6 +279,146 @@ _main:
     call strcmp
     test rax, rax
     jle .fail
+
+    ; ---- I: memchr finds 'W' at index 6 of "HELLO WORLD!" ----
+    mov byte [fail_id], 'I'
+    lea rdi, [ref_hi]
+    mov esi, 'W'
+    mov rdx, ref_hi_len
+    call memchr
+    lea rcx, [ref_hi + 6]           ; expected pointer
+    cmp rax, rcx
+    jne .fail
+
+    ; ---- J: memchr misses within n → NULL ----
+    mov byte [fail_id], 'J'
+    lea rdi, [ref_hi]
+    mov esi, 'Z'                    ; not present in "HELLO WORLD!"
+    mov rdx, ref_hi_len
+    call memchr
+    test rax, rax
+    jnz .fail
+
+    ; ---- K: memchr n = 0 → NULL ----
+    mov byte [fail_id], 'K'
+    lea rdi, [ref_hi]
+    mov esi, 'H'                    ; would match index 0 for any n > 0
+    xor rdx, rdx
+    call memchr
+    test rax, rax
+    jnz .fail
+
+    ; ---- L: strchr finds 'o' at index 4 of "hello" ----
+    mov byte [fail_id], 'L'
+    lea rdi, [msg_hello]
+    mov esi, 'o'
+    call strchr
+    lea rcx, [msg_hello + 4]
+    cmp rax, rcx
+    jne .fail
+
+    ; ---- M: strchr(s, '\0') → pointer to the terminator ----
+    mov byte [fail_id], 'M'
+    lea rdi, [msg_hello3]
+    xor esi, esi                    ; look for '\0'
+    call strchr
+    lea rcx, [msg_hello3 + 5]       ; "hello" is 5 chars; terminator at 5
+    cmp rax, rcx
+    jne .fail
+
+    ; ---- N: strchr miss → NULL ----
+    mov byte [fail_id], 'N'
+    lea rdi, [msg_hello]
+    mov esi, 'q'                    ; not present in "hello"
+    call strchr
+    test rax, rax
+    jnz .fail
+
+    ; ---- O: strncmp equal in first n → 0 ----
+    mov byte [fail_id], 'O'
+    lea rdi, [msg_abcXX]
+    lea rsi, [msg_abcYY]
+    mov rdx, 3                      ; only compare "abc" vs "abc"
+    call strncmp
+    test rax, rax
+    jnz .fail
+
+    ; ---- P: strncmp first differing byte within n → nonzero ----
+    mov byte [fail_id], 'P'
+    lea rdi, [msg_abc]              ; "abc"
+    lea rsi, [msg_abd]              ; "abd"
+    mov rdx, 3
+    call strncmp
+    ; 'c' (0x63) - 'd' (0x64) = -1 → strictly negative.
+    test rax, rax
+    jns .fail
+
+    ; ---- Q: strncmp bound stops before the differing byte → 0 ----
+    mov byte [fail_id], 'Q'
+    lea rdi, [msg_abc]
+    lea rsi, [msg_abd]
+    mov rdx, 2                      ; only "ab" vs "ab"
+    call strncmp
+    test rax, rax
+    jnz .fail
+
+    ; ---- R: strncmp shorter side < longer when NUL comes first ----
+    mov byte [fail_id], 'R'
+    lea rdi, [msg_ab]               ; "ab" (NUL at index 2)
+    lea rsi, [msg_abc]              ; "abc"
+    mov rdx, 5                      ; n larger than either string
+    call strncmp
+    ; At index 2, msg_ab has '\0' (0) and msg_abc has 'c' (0x63).
+    ; 0 - 0x63 = -99 → strictly negative.
+    test rax, rax
+    jns .fail
+
+    ; ---- S: strncmp n = 0 → 0 regardless of content ----
+    mov byte [fail_id], 'S'
+    lea rdi, [msg_abc]
+    lea rsi, [msg_abZ]
+    xor rdx, rdx
+    call strncmp
+    test rax, rax
+    jnz .fail
+
+    ; ---- T: strcpy copies "hello" including the terminator ----
+    mov byte [fail_id], 'T'
+    ; Pre-fill dst with a distinctive pattern so leftover bytes are
+    ; visible if strcpy stops too early. Only the first 6 bytes
+    ; (5 chars + NUL) get overwritten; bytes 6..7 stay as sentinels.
+    mov byte [buf_cpy + 0], 0xAA
+    mov byte [buf_cpy + 1], 0xAA
+    mov byte [buf_cpy + 2], 0xAA
+    mov byte [buf_cpy + 3], 0xAA
+    mov byte [buf_cpy + 4], 0xAA
+    mov byte [buf_cpy + 5], 0xAA
+    mov byte [buf_cpy + 6], 0xAA
+    mov byte [buf_cpy + 7], 0xAA
+    lea rdi, [buf_cpy]
+    lea rsi, [msg_hello]            ; "hello\0"
+    call strcpy
+    ; buf_cpy should now hold "hello\0" in bytes 0..5, and the
+    ; two sentinels at 6..7 must still be 0xAA.
+    lea rdi, [buf_cpy]
+    lea rsi, [msg_hello]
+    mov rdx, 6                      ; 5 chars + NUL
+    call memcmp
+    test rax, rax
+    jnz .fail
+    cmp byte [buf_cpy + 6], 0xAA
+    jne .fail
+    cmp byte [buf_cpy + 7], 0xAA
+    jne .fail
+
+    ; ---- U: strcpy returns the original dst ----
+    mov byte [fail_id], 'U'
+    lea rdi, [buf_cpy]
+    lea rsi, [msg_hello2]
+    call strcpy
+    lea rcx, [buf_cpy]
+    cmp rax, rcx
+    jne .fail
 
     ; PASS
     mov rax, SYS_write
