@@ -98,6 +98,11 @@ A progressive walkthrough of x86-64 assembly with NASM. Each guide is intentiona
   `connect`, the `F_GETFL` / `F_SETFL` read-modify-write
   dance, why `-EAGAIN` is the whole point, and how
   non-blocking + `poll` becomes an event loop.
+- [Directory iteration](38-directory-iteration.md) —
+  libio's `dir_iter_open` / `_next` / `_close` iterator,
+  the caller-supplied buffer with no hidden state, the
+  `DT_*` type constants, and the macOS `getdirentries64`
+  / Linux `getdents64` split the wrapper hides.
 
 ## Appendix
 
