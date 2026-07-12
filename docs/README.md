@@ -88,6 +88,11 @@ A progressive walkthrough of x86-64 assembly with NASM. Each guide is intentiona
   three things poll does not tell you, and why libsock
   stops at poll rather than shipping `epoll` / `kqueue`
   wrappers.
+- [File locking with flock](36-file-locking.md) — the
+  three operations plus `LOCK_NB`, the advisory-vs-
+  mandatory distinction, why the per-open-file-
+  description scope makes `flock` the safer default over
+  `fcntl` POSIX locks, and non-blocking acquisition.
 
 ## Appendix
 
