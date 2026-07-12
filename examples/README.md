@@ -2,7 +2,7 @@
 
 A constructive sequence of small x86-64 NASM programs. Each example
 introduces exactly one new atomic concept on top of the previous one,
-so reading from `01` to `33` walks the entire control-and-data
+so reading from `01` to `34` walks the entire control-and-data
 vocabulary needed for the early chapters of [../docs/](../docs/).
 
 ## The sequence
@@ -42,6 +42,7 @@ vocabulary needed for the early chapters of [../docs/](../docs/).
 | 31 | [31-mmap-file](31-mmap-file/)                        | file-backed mmap — `ftruncate` + `pwrite` + `mmap(fd, offset)`         | —                                             |
 | 32 | [32-mmap-shared](32-mmap-shared/)                    | `MAP_SHARED` + `fork` — one-byte IPC through a shared anonymous page   | —                                             |
 | 33 | [33-spawn-child](33-spawn-child/)                    | `spawn_wait` — first libproc `util/` helper; folds fork + execve + wait4 | —                                             |
+| 34 | [34-echo-server](34-echo-server/)                    | TCP echo loop with `send_all` — first real user of libsock v1.4         | —                                             |
 
 Examples 1 and 2 do not have a dedicated chapter — they are the
 smallest possible programs and exist so that every later example can
